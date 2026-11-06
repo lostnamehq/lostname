@@ -1,0 +1,18 @@
+{
+  "schema": "lostname.config/v0",
+  "sim": {
+    "ttls": { "ds_seconds": 86400, "negative_seconds": 600, "ns_parent_seconds": 86400, "dnskey_seconds": 3600 },
+    "margin_seconds": 3600,
+    "locks": {
+      "none": { "latency_seconds": 0, "window_seconds": 0, "source": "no registry lock" },
+      "domain-shield": { "latency_seconds": 14400, "window_seconds": 86400,
+        "source": "planning assumption for .be Domain Shield: unlock latency is the registrar's; replace with its stated or measured time. The 24 h window is DNS Belgium's" },
+      "domain-guard": { "latency_seconds": 172800, "window_seconds": 0,
+        "source": ".be Domain Guard: DNS Belgium answers within 2 working days, one confirmation per change request" }
+    }
+  },
+  "probe": { "canary": "203.0.113.1:53", "timeout_seconds": 2 },
+  "parity": { "timeout_seconds": 3, "edns_buffer_bytes": 1232, "nx_probe_label": "lostname-nx-probe", "model": "T0" },
+  "fetch": { "timeout_seconds": 10 },
+  "lint": { "disabled_rules": [], "severity": {} }
+}

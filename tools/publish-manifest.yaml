@@ -1,0 +1,17 @@
+# Every git-tracked file is public or holdback; a file in neither fails the export (fail-closed).
+# holdback wins over public. The identity and infrastructure patterns live in the held-back
+# tools/publish-private.yaml and in the LOSTNAME_PRIVATE_PATTERNS secret, never here.
+public:
+  - "*"
+holdback:
+  - "docs/reviews/**"
+  - "tools/publish-private.yaml"
+review_flags:
+  - "(?i)red[- ]?team"
+  - "(?i)exploit\\b"
+  - "(?i)residual risk"
+  - "(?i)\\bCVE-[0-9]"
+hard_fail:
+  - "C:\\\\Users\\\\"
+  - "/home/[a-z]"
+  - "(?i)\\b[a-z]:/users/"

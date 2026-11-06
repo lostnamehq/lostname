@@ -1,0 +1,18 @@
+# Weekly, grouped updates as pull requests that CI checks. Add one entry per ecosystem the repository pins.
+# Docker updates only find files named Dockerfile*; pip updates bump constraints: regenerate the lock in the same PR.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups: {ci-tools: {patterns: ["*"]}}
+  # - package-ecosystem: pip          # hash-locked requirements
+  #   directory: /
+  #   schedule: {interval: weekly}
+  #   groups: {ci-tools: {patterns: ["*"]}}
+  - package-ecosystem: gomod
+    directories: [/]
+    schedule: {interval: weekly}
+  # - package-ecosystem: docker       # base images pinned by digest
+  #   directory: /
+  #   schedule: {interval: weekly}

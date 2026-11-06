@@ -1,0 +1,23 @@
+# What repo-kit renders into this repository and checks it against.
+kit: 1
+profile: product          # product | spec | site | org-profile | personal
+values:
+  Name: Lostname
+  NAME: LOSTNAME          # prefix of the private-patterns secret
+  org: lostnamehq
+  repo: lostname
+  licence: EUPL-1.2
+  contribution_terms: "Contributions are accepted under EUPL-1.2, inbound equals outbound, with a Developer Certificate of Origin sign-off on every commit (git commit -s)."
+  maintainer: vdhome-dev
+  since: "2026-11"
+  year: "2026"
+  gate_command: "python tools/check.py"
+  supported_line: "none yet (pre-release)"
+  status_line: "Pre-release, published early: the model, the lab and the first commands work; not for production yet."
+  next_milestone: "0.1.0"
+  components: "lint, fetch, parity, sim, model and docs, tools or CI"
+  one_sentence: "Prove you can leave your DNS provider: zone lint, provider parity, exit simulation and evidence."
+  badges: ""
+  why_hint: ""
+  hook_setup: "run python tools/check.py before every push"
+  trademark_status: " (not a registered trademark)"

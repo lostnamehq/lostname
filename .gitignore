@@ -1,0 +1,12 @@
+.tools/
+m0/runs/
+*.local.*
+creds*.json
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Go
+/lostname
+/lostname.exe
+*.test

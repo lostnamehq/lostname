@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>lostname: number portability for your domain name</title>
+<meta name="description" content="Lostname is an open-source command-line tool that proves you can leave your DNS provider: zone lint, provider parity, exit simulation and evidence.">
+<meta property="og:title" content="lostname">
+<meta property="og:description" content="Last name standing. Prove you can leave your DNS provider without losing your name.">
+<meta property="og:image" content="https://lostname.be/social.png">
+<meta property="og:url" content="https://lostname.be/">
+<link rel="canonical" href="https://lostname.be/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/jetbrains-mono-bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <a class="brand" href="/" aria-label="lostname home">
+    <picture>
+      <source srcset="wordmark-dark.svg" media="(prefers-color-scheme: dark)">
+      <img src="wordmark.svg" alt="l*stname." width="144" height="40">
+    </picture>
+  </a>
+  <nav aria-label="Project">
+    <a href="#how">What it checks</a>
+    <a href="https://github.com/lostnamehq/lostname">GitHub</a>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <h1 id="hero-title">Last name standing<span class="root">.</span></h1>
+    <p class="lede">Number portability for your domain name. Lostname proves you can leave your DNS provider before you have to, and shows what would break if you left today.</p>
+    <p class="actions">
+      <a class="button" href="https://github.com/lostnamehq/lostname">Read the code on GitHub</a>
+      <a class="quiet" href="#how">See what it checks</a>
+    </p>
+  </section>
+
+  <figure class="run" aria-labelledby="run-cap">
+    <pre class="term"><code><span class="line"><span class="ps">$</span> lostname lint --zone lostname.be.zone --origin lostname.be</span>
+<span class="line">L-07  note    lostname.be. CAA: CAA issue "letsencrypt.org" has no accounturi: any account at that CA may issue (RFC 8657)</span>
+<span class="line verdict">lint pass: lostname.be., 17 record(s), 0 blocker(s), 0 risk(s), 1 note(s)</span></code></pre>
+    <figcaption id="run-cap">This site's own domain, checked by Lostname on 6 November 2026. The note stands: GitHub requests the certificate, so the account can't be pinned.</figcaption>
+  </figure>
+
+  <section class="why" aria-labelledby="why-title">
+    <h2 id="why-title">Moving DNS breaks things quietly</h2>
+    <p>You can keep your phone number when you switch operators. Domains have no such guarantee. A move between DNS providers can:</p>
+    <ul class="breaks">
+      <li><strong>drop the SOA</strong> in the export, so the zone stops being served;</li>
+      <li><strong>leave the DNSSEC keys behind</strong>, so validating resolvers fail;</li>
+      <li><strong>lose provider-specific records</strong> that exist nowhere else;</li>
+      <li><strong>orphan mail and certificate renewals</strong> tied to the old provider's API.</li>
+    </ul>
+    <p>Most owners find out during the move. Lostname finds out before it.</p>
+  </section>
+
+  <section id="how" class="how" aria-labelledby="how-title">
+    <h2 id="how-title">What lint catches</h2>
+    <p>A test zone with the usual traps. Every finding names the record, the reason and the RFC; a blocker fails the run.</p>
+    <pre class="term term-light"><code><span class="line"><span class="ps">$</span> lostname lint --zone broken.example.test.zone --origin example.test</span>
+<span class="line">L-08  blocker www.example.test. CNAME: CNAME next to other data (TXT) (RFC 1034 3.6.2, RFC 2181 10.1)</span>
+<span class="line">L-09  blocker sub.example.test. NS: delegation to ns.sub.example.test. needs glue, and the zone has no A or AAAA for it (RFC 9471 3.1)</span>
+<span class="line">L-14  risk    example.test. CAA: critical CAA tag "tbs" is not a registered tag: a CA must refuse to issue (RFC 8659 4.1)</span>
+<span class="line">L-15  risk    example.test. NS: the apex has fewer than two NS records (RFC 1034 4.1)</span>
+<span class="line">L-18  risk    example.test. MX: MX points at mail.example.test., which is a CNAME (RFC 2181 10.3)</span>
+<span class="line verdict">lint fail: example.test., 12 record(s), 2 blocker(s), 5 risk(s), 1 note(s)</span></code></pre>
+    <p class="aside">Shortened: three of the eight findings are left out. Run it yourself on <code>internal/lint/testdata</code>.</p>
+  </section>
+
+  <section class="road" aria-labelledby="road-title">
+    <h2 id="road-title">From a lint to a yearly drill</h2>
+    <ol class="ladder">
+      <li class="now">
+        <span class="rel">v0.1</span>
+        <div>
+          <h3>Know what won't move</h3>
+          <p><code>lint --to &lt;provider&gt;</code> lists what will not survive a move to that provider. <code>parity</code> checks that two providers answer every query the same, authoritatively.</p>
+          <p class="state">In progress: <code>lint</code>, <code>fetch</code> and <code>parity</code> work today, DNSSEC parity is next.</p>
+        </div>
+      </li>
+      <li>
+        <span class="rel">v0.2</span>
+        <div>
+          <h3>Plan the move and see it first</h3>
+          <p><code>plan --from A --to B</code> gives the safe order of steps, DNSSEC included, with waits computed from your real TTLs: your exit time. <code>simulate</code> shows what any resolver would see at every step, and what goes wrong if a step fails.</p>
+        </div>
+      </li>
+      <li>
+        <span class="rel">v0.3</span>
+        <div>
+          <h3>Rehearse it every year</h3>
+          <p><code>drill</code> runs the exit exercise; <code>report</code> leaves the evidence to show for it.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="rules" aria-labelledby="rules-title">
+    <h2 id="rules-title">How it behaves</h2>
+    <dl>
+      <dt>No verdict without authority</dt>
+      <dd>A check that didn't get an authoritative answer from every server it compares says "no verdict", never "all clear".</dd>
+      <dt>Read-only, and the owner acts</dt>
+      <dd>Lostname never opens your credentials file and never operates DNS for anyone.</dd>
+      <dt>Builds on what exists</dt>
+      <dd>DNSControl does export, import and push. Lostname calls the official, pinned binary and adds what it lacks.</dd>
+      <dt>Evidence as a by-product</dt>
+      <dd>Every finding says what was seen, where, when and by which version. Every run leaves a bundle with a checksum manifest.</dd>
+    </dl>
+  </section>
+
+  <section class="get" aria-labelledby="get-title">
+    <h2 id="get-title">Try it</h2>
+    <p>Pre-release, published early: not for production yet. With Go installed, from a clone of the repository:</p>
+    <pre class="term term-light"><code><span class="line"><span class="ps">$</span> go run ./cmd/lostname lint --zone example.zone --origin example.com</span></code></pre>
+    <p>Once released: <code>go install lostname.be/lostname/cmd/lostname@latest</code></p>
+  </section>
+</main>
+
+<footer>
+  <p>Open source under the <a href="https://github.com/lostnamehq/lostname/blob/main/LICENSE">EUPL-1.2</a>.
+  Found a security problem? <a href="https://github.com/lostnamehq/lostname/security/advisories/new">Report it privately</a>.</p>
+  <p>This site sets no cookies and loads nothing from anywhere else.</p>
+</footer>
+</body>
+</html>

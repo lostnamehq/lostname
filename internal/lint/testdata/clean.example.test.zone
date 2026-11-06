@@ -1,0 +1,13 @@
+$ORIGIN example.test.
+$TTL 3600
+@         IN SOA   ns1.example.test. hostmaster.example.test. 1 7200 900 1209600 300
+@         IN NS    ns1.example.test.
+@         IN NS    ns2.example.test.
+ns1       IN A     192.0.2.53
+ns2       IN A     198.51.100.53
+@         IN MX    10 mail.example.test.
+mail      IN A     192.0.2.25
+@         IN CAA   0 issue "ca.example; accounturi=https://ca.example/acct/1"
+www       IN CNAME web.provider.invalid.
+sub       IN NS    ns.sub.example.test.
+ns.sub    IN A     192.0.2.54

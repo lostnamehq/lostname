@@ -1,0 +1,46 @@
+# What may go public, decided per path from the start. First match wins.
+# public    = may be exported as is (scanned by the denylist)
+# generated = produced by tools/publicize.py from private/src/ (scanned, and must be up to date)
+# verbatim  = public third-party text kept word for word (licences); not scanned
+# internal  = never leaves this repository
+# A tracked file that matches nothing blocks the commit (tools/public_check.py).
+internal  private/*
+internal  m0/runs/*
+generated docs/model.md
+generated docs/prior-art.md
+public    docs/*
+public    README.md
+public    ROADMAP.md
+public    CONTRIBUTING.md
+public    SECURITY.md
+public    CHANGELOG.md
+verbatim  LICENSE
+public    publication.txt
+public    .gitignore
+public    .gitlab/*
+public    brand/final/*
+verbatim  brand/Fonts/OFL.txt
+public    brand/Fonts/*
+public    brand/README.md
+public    m0/*
+public    tools/*
+public    tests/*
+public    go.mod
+public    go.sum
+public    model/*
+public    cmd/*
+verbatim  site/fonts/OFL.txt
+public    site/*
+public    internal/*
+public    .gitattributes
+public    .github/*
+public    changelog.d/*
+public    CODE_OF_CONDUCT.md
+public    GOVERNANCE.md
+public    MAINTAINERS.md
+public    NOTICE
+public    REUSE.toml
+public    SUPPORT.md
+public    TRADEMARK.md
+public    requirements-test.txt
+public    FUZZING.md

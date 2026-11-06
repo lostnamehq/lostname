@@ -1,0 +1,18 @@
+version = 1
+SPDX-PackageName = "Lostname"
+SPDX-PackageSupplier = "VDHome"
+
+# Every file of ours: the copyright line beside each file's own SPDX-License-Identifier header (aggregate, so a file's
+# header still counts), and the licence for files that carry none (documents, the model, brand assets, test data).
+# Brand files are not EUPL: TRADEMARK.md governs the mark (InsularHQ lesson, 2026-11-03).
+[[annotations]]
+path = "brand/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 VDHome"
+SPDX-License-Identifier = "LicenseRef-Lostname-Brand"
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 VDHome and the Lostname contributors"
+SPDX-License-Identifier = "EUPL-1.2"

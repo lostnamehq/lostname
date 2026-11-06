@@ -1,0 +1,51 @@
+# The same gate as before every push (tools/check.py): gofmt, vet on four targets, staticcheck, tests with -race,
+# fuzzing, govulncheck, the publication gate and the Python tests. Job names are stable: the main ruleset requires them.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: pip install -q --require-hashes -r requirements-test.txt
+      - name: lint (gofmt, vet, staticcheck), test, fuzz and scan (tools/check.py)
+        run: python tools/check.py
+        env:
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: go test -count=1 ./...
+        env:
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
