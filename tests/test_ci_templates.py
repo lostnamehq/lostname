@@ -25,7 +25,7 @@ def flags_in(text: str) -> set:
 def test_gitlab_template():
     doc = yaml.safe_load((CI / "gitlab-ci.yml").read_text(encoding="utf-8"))
     job = doc["lostname-parity"]
-    assert re.fullmatch(r"[a-z0-9./-]+@sha256:[A-Za-z0-9_]+", doc["variables"]["LOSTNAME_IMAGE"])
+    assert re.fullmatch(r"[a-z0-9./-]+@sha256:[0-9a-f]{64}", doc["variables"]["LOSTNAME_IMAGE"])  # a real digest
     assert any("schedule" in r["if"] for r in job["rules"])
     script = "\n".join(job["script"])
     assert "lostname parity" in script and "exit $code" in script
@@ -41,7 +41,7 @@ def test_github_template():
     assert doc["permissions"] == {"contents": "read"}
     job = doc["jobs"]["parity"]
     assert job["permissions"] == {"contents": "read", "security-events": "write"}
-    assert "@sha256:" in job["container"]["image"]
+    assert re.fullmatch(r"[a-z0-9./-]+@sha256:[0-9a-f]{64}", job["container"]["image"])
     for step in job["steps"]:
         if "uses" in step:
             assert re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", step["uses"]), step["uses"]

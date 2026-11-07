@@ -1,0 +1,1 @@
+- The CI templates in `deploy/ci/` pin the v0.1.0 image by its digest instead of a placeholder.
