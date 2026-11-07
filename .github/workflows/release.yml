@@ -65,6 +65,11 @@ jobs:
             case "$f" in *.cdx.json) continue;; esac
             go version -m "$f" | grep -q 'vcs.modified=false' || { echo "$f: not built from a clean tree"; exit 1; }
           done
+          # A release binary names the tag it is released as (Go stamps it from the tagged checkout).
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            got=$(dist/lostname_linux_amd64 version --json | jq -r .version)
+            [ "$got" = "$TAG" ] || { echo "the binary says it is $got, the tag is $TAG"; exit 1; }
+          fi
       - name: Vulnerability statement (OpenVEX)
         run: |
           go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -format openvex ./... > dist/lostname.openvex.json

@@ -67,6 +67,7 @@ Most owners find out during the move. Lostname finds out before it.
 | `watch` | `lint` and `parity` on a schedule: Prometheus metrics, OTLP, optional events and traces, and an exit-readiness SLO | v0.1 |
 | `fetch` | the zone itself, by zone transfer (AXFR, TSIG) | v0.1 |
 | `doctor`, `config` | can this machine and network path give verdicts at all; the effective configuration | v0.1 |
+| `version`, `help` | which release and commit this binary was built from (`--json` too); the usage text | v0.1 |
 | `plan --from A --to B` | the safe order of steps, DNSSEC included, with the waits computed from your real TTLs, and the **exit time** | v0.2 |
 | `simulate` | what any resolver would see at every step of that plan, including what goes wrong if a step fails | v0.2 |
 | `drill`, `report` | the yearly exit exercise, and the evidence to show for it | v0.3 |

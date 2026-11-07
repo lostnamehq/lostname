@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lostname.be/schemas/version.schema.json",
+  "title": "lostname version",
+  "description": "Output of `lostname version --json`: read from the build information Go stamps into the binary. version is the tag for a release or `go install ...@vX.Y.Z`, \"(devel)\" for a local build; commit is empty when the build had no VCS information; modified is true when the tree had uncommitted changes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "commit", "modified", "go"],
+  "properties": {
+    "schema": {"const": "lostname.version/v0"},
+    "version": {"type": "string"},
+    "commit": {"type": "string"},
+    "modified": {"type": "boolean"},
+    "go": {"type": "string"}
+  }
+}

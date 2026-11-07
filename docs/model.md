@@ -201,6 +201,7 @@ Exit codes: 0 = ok; 1 = findings at or above the threshold; 2 = no verdict (P1, 
 |---|---|---|
 | `config` | v0.1 | never (exit 3 on an invalid file) |
 | `doctor` | v0.1 | a check fails (2 when the path is intercepted) |
+| `version [--json]`, `help` | v0.1 | never |
 | `lint --zone F\|--dnscontrol-ir F [--to P]` | v0.1 | any blocker (or a risk with `--strict`) |
 | `fetch --axfr HOST:PORT` | v0.1 | never; exit 2 when the transfer cannot be trusted |
 | `parity --provider A=ADDR[,ADDR] --provider B=... [--parent ADDR] [--model T0\|T1\|T2]` | v0.1 | any failure in section 4 |

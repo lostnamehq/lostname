@@ -32,6 +32,8 @@ def test_release_workflow_shape():
     assert "dist-again" in runs[build] and "diff dist/SHA256SUMS dist-again/SHA256SUMS" in runs[build]
     # a binary stamped vcs.modified=true is refused; the build directories are ignored so they cannot cause it
     assert "vcs.modified=false" in runs[build]
+    # on a tag push, the binary's own `version` must name that tag
+    assert "version --json" in runs[build] and '"$got" = "$TAG"' in runs[build]
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert "/dist/" in ignored and "/dist-again/" in ignored
     # the build refuses a dirty checkout; the tag check writes outside it (v0.1.0-rc.1 stopped on this)
