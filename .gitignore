@@ -7,6 +7,9 @@ __pycache__/
 .pytest_cache/
 
 # Go
+# release builds (tools/build.py): untracked files here would stamp every later binary vcs.modified=true
+/dist/
+/dist-again/
 /lostname
 /lostname.exe
 *.test

@@ -56,6 +56,11 @@ jobs:
           python tools/build.py dist
           python tools/build.py dist-again
           diff dist/SHA256SUMS dist-again/SHA256SUMS
+          # Each binary must say it was built from the clean, tagged tree.
+          for f in dist/lostname_*; do
+            case "$f" in *.cdx.json) continue;; esac
+            go version -m "$f" | grep -q 'vcs.modified=false' || { echo "$f: not built from a clean tree"; exit 1; }
+          done
       - name: Vulnerability statement (OpenVEX)
         run: |
           go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -format openvex ./... > dist/lostname.openvex.json

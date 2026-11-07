@@ -30,6 +30,10 @@ def test_release_workflow_shape():
     assert verify < build, "the tag signature must be checked before anything is built"
     assert "allowedSignersFile=lostname.allowed_signers" in runs[verify] and "Good \"git\" signature" in runs[verify]
     assert "dist-again" in runs[build] and "diff dist/SHA256SUMS dist-again/SHA256SUMS" in runs[build]
+    # a binary stamped vcs.modified=true is refused; the build directories are ignored so they cannot cause it
+    assert "vcs.modified=false" in runs[build]
+    ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert "/dist/" in ignored and "/dist-again/" in ignored
     joined = "\n".join(runs)
     assert "cosign sign-blob" in joined and "cosign sign --yes" in joined and "-format openvex" in joined
     assert sum("attest-build-provenance" in s.get("uses", "") for s in steps) == 2
