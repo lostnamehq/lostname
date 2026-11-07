@@ -34,6 +34,9 @@ def test_release_workflow_shape():
     assert "vcs.modified=false" in runs[build]
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert "/dist/" in ignored and "/dist-again/" in ignored
+    # the build refuses a dirty checkout; the tag check writes outside it (v0.1.0-rc.1 stopped on this)
+    assert "git status --porcelain" in runs[build]
+    assert "$RUNNER_TEMP/tag-verify.txt" in runs[verify] and "tee tag-verify" not in runs[verify]
     joined = "\n".join(runs)
     assert "cosign sign-blob" in joined and "cosign sign --yes" in joined and "-format openvex" in joined
     assert sum("attest-build-provenance" in s.get("uses", "") for s in steps) == 2
