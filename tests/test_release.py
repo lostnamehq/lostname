@@ -80,6 +80,11 @@ def test_release_notes():
     digest = "sha256:" + "a" * 64
     out = m.notes("v0.1.0", digest, log)
     assert "- lint, parity" in out and "old" not in out and f"ghcr.io/lostnamehq/lostname@{digest}" in out
+    # both cosign commands name the exact signer: the release workflow at this tag, not any workflow of the repository
+    signer = "https://github.com/lostnamehq/lostname/.github/workflows/release.yml@refs/tags/v0.1.0"
+    assert out.count(f"--certificate-identity {signer} ") == 2 and "identity-regexp" not in out
+    # a candidate takes the coming release's notes; the test supplies them, the live changelog may have none
+    m.unreleased = lambda: "### Upgrading\n- coming"
     rc = m.notes("v0.1.0-rc.1", digest, log)
     assert rc.startswith("Release candidate for v0.1.0") and "### Upgrading" in rc, rc[:200]
     for bad in [("v0.2.0", digest), ("0.1.0", digest), ("v0.1.0", "sha256:short"), ("v0.1.0-beta", digest)]:

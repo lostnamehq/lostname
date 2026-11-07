@@ -18,9 +18,9 @@ Lostname is a command-line tool for domain owners and the IT partners who run do
 question before you need it: *if we had to move our DNS today, what would break, how long would it take, and can we
 prove it went right?*
 
-> **Status: v0.1 release candidates.** `lint`, `parity`, `mail`, `watch`, `fetch`, `doctor` and `config` work and are
-> tested; `plan`, `simulate`, `drill` and `report` are the plan (`ROADMAP.md`). Output formats and the observability
-> contract are stable from v0.1.0; until then they may still change.
+> **Status: v0.1.0.** `lint`, `parity`, `mail`, `watch`, `fetch`, `doctor` and `config` work and are tested; `plan`,
+> `simulate`, `drill` and `report` are the plan (`ROADMAP.md`). Flags, exit codes, JSON schemas and the observability
+> contract follow semantic versioning from v0.1.0 (`CHANGELOG.md`, Upgrading).
 
 ## Quick start
 
