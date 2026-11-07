@@ -77,7 +77,9 @@ const usage = `usage (every command takes --config FILE; see lostname config):
   lostname parity --zone FILE --origin NAME --provider A=ADDR[,ADDR] --provider B=ADDR[,ADDR] [--parent ADDR[,ADDR]]
                   [--model T0|T1|T2] [--json|--sarif] [--evidence DIR]
                                                                     compare what the providers serve; the first is the reference
-  lostname watch [--config FILE] [--once]                            run the configured checks on an interval; /metrics`
+  lostname watch [--config FILE] [--once]                            run the configured checks on an interval; /metrics
+  lostname version [--json]                                          print the version and commit this binary was built from
+  lostname help                                                      print this text`
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
@@ -108,6 +110,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runMail(args[1:], stdout, stderr)
 	case "doctor":
 		return runDoctor(args[1:], stdout, stderr)
+	case "version", "--version", "-version":
+		return runVersion(args[1:], stdout, stderr)
+	case "help", "--help", "-help", "-h":
+		fmt.Fprintln(stdout, usage)
+		return exitPass
 	default:
 		fmt.Fprintf(stderr, "lostname: unknown command %q\n%s\n", args[0], usage)
 		return exitUsage
