@@ -19,8 +19,8 @@ jobs:
       contents: read
       security-events: write  # to upload the SARIF report to code scanning
     container:
-      # The release image, pinned by digest: take the digest from the release's SHA256SUMS or release notes.
-      image: ghcr.io/lostnamehq/lostname@sha256:REPLACE_WITH_THE_RELEASE_DIGEST
+      # The v0.1.0 image, pinned by digest; for a later release take the digest from its release notes.
+      image: ghcr.io/lostnamehq/lostname@sha256:734bcef467ba74f173f8265ee48786e7b4a596f1a0e222dd07c2effb061de9db
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -6,8 +6,8 @@
 # settings. The job fails when the providers differ (exit 1) and when it cannot give a verdict (exit 2): an
 # unmeasured standby is not a ready one. The SARIF report and the evidence bundle are kept either way.
 variables:
-  # The release image, pinned by digest: take the digest from the release's SHA256SUMS or release notes.
-  LOSTNAME_IMAGE: "ghcr.io/lostnamehq/lostname@sha256:REPLACE_WITH_THE_RELEASE_DIGEST"
+  # The v0.1.0 image, pinned by digest; for a later release take the digest from its release notes.
+  LOSTNAME_IMAGE: "ghcr.io/lostnamehq/lostname@sha256:734bcef467ba74f173f8265ee48786e7b4a596f1a0e222dd07c2effb061de9db"
   LOSTNAME_ZONE_FILE: "dns/example.test.zone"    # the zone as it should be served (a file in this repository)
   LOSTNAME_ORIGIN: "example.test"
   LOSTNAME_PROVIDER_A: "primary=192.0.2.53:53,198.51.100.53:53"  # the reference: NAME=ADDR[,ADDR]
