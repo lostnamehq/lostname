@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "lostname",
+          "version": "(devel)",
+          "informationUri": "https://lostname.be/",
+          "rules": [
+            {
+              "id": "L-07",
+              "shortDescription": {
+                "text": "Lostname lint rule L-07 (model section 3)"
+              },
+              "helpUri": "https://github.com/lostnamehq/lostname/blob/main/docs/model.md"
+            },
+            {
+              "id": "L-11",
+              "shortDescription": {
+                "text": "Lostname lint rule L-11 (model section 3)"
+              },
+              "helpUri": "https://github.com/lostnamehq/lostname/blob/main/docs/model.md"
+            },
+            {
+              "id": "L-12",
+              "shortDescription": {
+                "text": "Lostname lint rule L-12 (model section 3)"
+              },
+              "helpUri": "https://github.com/lostnamehq/lostname/blob/main/docs/model.md"
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "L-07",
+          "level": "note",
+          "message": {
+            "text": "CAA issue \"letsencrypt.org\" has no accounturi: any account at that CA may issue (RFC 8657)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "INPUT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "example.test. CAA"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "ruleId": "L-11",
+          "level": "error",
+          "message": {
+            "text": "the delegation names ns1.dns-host.example., a server of the current DNS provider: after the exit it is lame unless shop.example.test. moves too (Lostname model section 3)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "INPUT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "shop.example.test. NS"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "ruleId": "L-12",
+          "level": "warning",
+          "message": {
+            "text": "CNAME points at proxy.dns-host.example., under dns-host.example, the current DNS provider's own domain: check that it keeps working after the exit (Lostname model section 3)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "INPUT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "www.example.test. CNAME"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

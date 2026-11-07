@@ -79,7 +79,7 @@ func TestOutputIsDeterministic(t *testing.T) {
 
 // Decision 0008: lint makes no network calls. Our lint and zone packages must not import the network packages.
 func TestNoNetworkImports(t *testing.T) {
-	for _, dir := range []string{".", "../zone"} {
+	for _, dir := range []string{".", "../zone", "../records"} {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		if err != nil || len(files) == 0 {
 			t.Fatalf("no Go files in %s: %v", dir, err)

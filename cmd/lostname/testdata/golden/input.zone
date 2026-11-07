@@ -1,0 +1,14 @@
+$ORIGIN example.test.
+$TTL 3600
+@ IN SOA ns1.dns-host.example. hostmaster 1 7200 900 1209600 300
+@ IN NS ns1.dns-host.example.
+@ IN NS ns2.dns-host.example.
+@ IN MX 10 mx.example.test.
+mx IN A 192.0.2.25
+www IN CNAME proxy.dns-host.example.
+@ IN CAA 0 issue "letsencrypt.org"
+@ IN TXT "v=spf1 mx include:_spf.mail.example ~all"
+_dmarc IN TXT "v=DMARC1; p=none; rua=mailto:dmarc@example.test"
+s1._domainkey IN TXT "v=DKIM1; p="
+_mta-sts IN TXT "v=STSv1; id=20261106"
+shop IN NS ns1.dns-host.example.

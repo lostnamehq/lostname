@@ -23,15 +23,16 @@ The order of work and its direction. Dates are targets, not promises; versions a
 ## v0.1: lint and parity (target December 2026)
 - **Inputs:** RFC 1035 zone files, AXFR (TSIG) and live queries, besides DNSControl. `lint` makes no network calls.
 - **Output:** deterministic JSON with a published schema. Exit codes: 0 pass, 1 findings, 2 no verdict, 3 input error.
-- **`lint`** for portability to a target provider (L-01 to L-19 [3]), plus the shared-fate check L-20 [13]: shared nameserver names, addresses, prefixes and AS numbers between providers.
+- **`lint`** for portability to a target provider [3]: rules L-00 to L-04, L-07 to L-16, L-18 and L-20 to L-22, with L-19 (CDS across providers) and L-20 between providers in `parity`. The shared-fate check L-20 [13] covers shared nameserver addresses and prefixes; AS numbers come with the diversity score in v0.2.
 - **`parity`**, authority-aware and fail-closed [4]:
   - per address, over UDP and TCP;
   - DNSSEC signatures validated;
-  - wildcard and denial probes;
+  - wildcard and denial probes, and the no-DS proof in referrals (NSEC3 opt-out included);
   - interception detection.
-- **DNS and mail record engine:** SPF, DMARC (RFC 9989), DKIM, MTA-STS, TLS-RPT, CAA, DNSSEC and DANE TLSA, the base for mail continuity (D13).
+- **DNS and mail record engine** (`lostname mail`, offline): SPF, DMARC (RFC 9989), DKIM, MTA-STS, TLS-RPT, BIMI and DANE TLSA, the base for mail continuity (D13). CAA and DNSSEC stay in `lint` and `parity`.
 - **Evidence bundle,** unsigned [6].
-- **A CI template** that runs `parity` against a standby provider on a schedule.
+- **A CI template** that runs `parity` against a standby provider on a schedule: copy-paste files for GitLab CI and GitHub Actions, using the container image by digest.
+- **Release supply chain:** reproducible builds, signed tags, cosign keyless signatures, SLSA provenance, a CycloneDX SBOM per binary, an OpenVEX from govulncheck, SHA256SUMS, and a non-root, read-only-root container image.
 - **Reliability and automation extras:**
   - serial drift between a provider's servers;
   - weak DNSSEC algorithm checks (RFC 8624);
@@ -52,10 +53,14 @@ The order of work and its direction. Dates are targets, not promises; versions a
   - provider-injected and hidden records (D15);
   - verification tokens, local output only (D14).
 - **`retire` mode** (D5) for names being given up.
+- **Provider capability profiles:** what each provider needs and allows, with sources, for the lint rules that need it: required metadata (L-05), TTL limits (L-06) and signing algorithms (L-17).
 - **Packs and modes:**
   - `.be` parent facts (D7);
   - break-glass exit kit (D17) with the account-loss tabletop drill (D21) and its manifest, the domain bill of materials (D16);
-  - portfolio mode for agencies (D9).
+  - portfolio mode for agencies (D9), reading zones in bulk from DNSControl `get-zones` output for providers without zone transfer (credentials stay in DNSControl).
+- **A report a person can read:** a static HTML page per zone, in English and Dutch, built from the JSON reports: lint, parity, the plan and its exit time, labelled modelled until rehearsals measure it.
+- **A digest without a metrics stack:** `watch --once --digest FILE` writes a short summary of every zone (verdicts, what changed, exit time) for any scheduler and mailer to deliver. Lostname does not send mail itself.
+- **A thin mapping to audit frameworks:** what each check shows, under "evidence, not compliance", reviewed by a qualified person before it ships.
 
 - **Sovereignty and automation:**
   - a jurisdiction map per zone, and an EU-only resolution check;
@@ -64,7 +69,7 @@ The order of work and its direction. Dates are targets, not promises; versions a
   - an encrypted second measurement path (DoH and DoT);
   - policy as code (Rego);
   - executable plans with human gates;
-  - container image, CI components and a stable Go API;
+  - published CI components (a GitHub Action, a GitLab CI catalog component) and a stable Go API;
   - dashboards as code.
 
 ## v0.3: rehearse and prove (target Q2-Q3 2027)
@@ -73,13 +78,12 @@ The order of work and its direction. Dates are targets, not promises; versions a
 - **Data:** the open EU provider portability dataset (D6) and ownership facts with sources (D2).
 - **Live:** the validation-aware cutover observer (D19) and provider-independent zone history (D18).
 - **Commands:** read-only `drill` and `report`.
-- **Proof at scale:** RIPE Atlas multi-vantage measurements; reproducible, signed builds with an SBOM and a fully offline mode.
+- **Proof at scale:** RIPE Atlas multi-vantage measurements and a fully offline mode.
 
 ## Later
 - **Full DNS observability** (`watch` beyond v0.1): one view over delegation, parity, DNSSEC state and expiry, record drift and mail records. It emits OpenTelemetry, Prometheus/OpenMetrics and versioned JSON events into the user's own stack, with optional dashboards and alert rules as code. It has no database or UI of its own.
 - `drill --apply`, only with the controls of model section 8.
 - A post-move guard that reuses existing takeover checkers.
-- Mappings to audit frameworks: parked until reviewed.
 
 ## Not planned
 - Hosting or operating DNS.

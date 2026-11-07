@@ -21,6 +21,10 @@ ns2   IN A      198.51.100.53
 sub   IN NS     ns.other.invalid.
 sub   IN DS     12345 13 1 0123456789ABCDEF0123456789ABCDEF01234567
 sub   IN DS     12345 13 2 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+sub   IN DS     12345 13 3 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+@     IN CDNSKEY 257 3 3 AwEAAcw=
+@     IN CDS    12345 13 1 0123456789ABCDEF0123456789ABCDEF01234567
+@     IN CDS    12345 13 2 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
 `
 
 func TestL21Algorithms(t *testing.T) {
@@ -41,8 +45,9 @@ func TestL21Algorithms(t *testing.T) {
 			notes++
 		}
 	}
-	// RSAMD5 key and the SHA-1 DS are risks; the RSASHA1 key is a note; ECDSA (13) and the SHA-256 DS pass.
-	if risks != 2 || notes != 1 {
-		t.Fatalf("want 2 risks and 1 note, got %d and %d", risks, notes)
+	// Risks: the RSAMD5 key, the SHA-1 DS, the GOST DS, the DSA CDNSKEY and the SHA-1 CDS. Note: the RSASHA1 key.
+	// ECDSA (13) and the SHA-256 DS and CDS pass.
+	if risks != 5 || notes != 1 {
+		t.Fatalf("want 5 risks and 1 note, got %d and %d", risks, notes)
 	}
 }

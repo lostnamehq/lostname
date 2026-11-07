@@ -1,0 +1,51 @@
+# Lostname: parity against a standby DNS provider, on a schedule (GitHub Actions). Copy this file to
+# .github/workflows/lostname-parity.yml and set the repository variables named below (Settings > Secrets and
+# variables > Actions > Variables). The job fails when the providers differ (exit 1) and when it cannot give a
+# verdict (exit 2): an unmeasured standby is not a ready one. The findings go to code scanning either way.
+name: Lostname parity
+on:
+  schedule:
+    - cron: "17 5 * * *"  # daily; pick your own minute
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write  # to upload the SARIF report to code scanning
+    container:
+      # The release image, pinned by digest: take the digest from the release's SHA256SUMS or release notes.
+      image: ghcr.io/lostnamehq/lostname@sha256:REPLACE_WITH_THE_RELEASE_DIGEST
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Parity
+        env:
+          ZONE_FILE: ${{ vars.LOSTNAME_ZONE_FILE }}       # e.g. dns/example.test.zone
+          ORIGIN: ${{ vars.LOSTNAME_ORIGIN }}             # e.g. example.test
+          PROVIDER_A: ${{ vars.LOSTNAME_PROVIDER_A }}     # the reference: NAME=ADDR[,ADDR]
+          PROVIDER_B: ${{ vars.LOSTNAME_PROVIDER_B }}     # the standby
+          PARENT: ${{ vars.LOSTNAME_PARENT }}             # the parent's servers, for a signed zone's DS chain
+        run: |
+          set -u
+          parent=""; if [ -n "$PARENT" ]; then parent="--parent $PARENT"; fi
+          code=0
+          lostname parity --zone "$ZONE_FILE" --origin "$ORIGIN" --provider "$PROVIDER_A" --provider "$PROVIDER_B" \
+            $parent --sarif --evidence lostname-evidence > lostname-parity.sarif || code=$?
+          echo "lostname parity exited $code (0 pass, 1 findings, 2 no verdict, 3 usage)"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+        id: parity
+      - uses: github/codeql-action/upload-sarif@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
+        if: always()
+        with:
+          sarif_file: lostname-parity.sarif
+          category: lostname-parity
+      - name: Verdict
+        if: always()
+        run: exit "${{ steps.parity.outputs.code }}"

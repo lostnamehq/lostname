@@ -24,9 +24,20 @@ func (v Violation) String() string {
 
 // Report is the result of exploring a plan.
 type Report struct {
-	Plan       string
-	Violations []Violation
-	Counts     map[Outcome]int // how many explored (state, server) combinations ended in each outcome
+	Plan        string
+	Violations  []Violation
+	Counts      map[Outcome]int // how many explored (state, server) combinations ended in each outcome
+	Drain       int             // seconds after the last step until no cache can hold an earlier step's state (M10)
+	Assumptions []string        // what the verdict assumes about resolvers; it holds only as far as they do
+}
+
+// Assumptions the explorer makes about resolvers (M10). A report carries them, so a verdict is never read without
+// them; each one is a place where a real resolver can behave differently.
+var Assumptions = []string{
+	"resolvers keep a record no longer than its TTL: no serve-stale (RFC 8767) beyond it, no minimum-TTL override",
+	"negative answers for the parent's DS are cached for min(SOA MINIMUM, SOA TTL) (RFC 2308 section 5)",
+	"a validating resolver takes the DNSKEY RRset from a server it could still reach under its cached NS RRset",
+	"step timers start once a change is visible at every parent server; the publication delay is measured, not modelled",
 }
 
 // OK reports whether the plan keeps the invariant: no bogus and no lame answer is reachable.
@@ -133,7 +144,46 @@ func Explore(p Plan) Report {
 		}
 	}
 	sort.SliceStable(rep.Violations, func(a, b int) bool { return rep.Violations[a].Step < rep.Violations[b].Step })
+	rep.Drain = drain(p, start, end)
+	rep.Assumptions = Assumptions
 	return rep
+}
+
+// drain is how long after the end of the last step a resolver can still hold parent NS, parent DS or a DNSKEY RRset
+// from an earlier step that differs from the last step's (M10). The plan is not over until then: the exit time
+// includes it, and nothing from an earlier step (the old provider's servers or keys) may be relied on to be gone
+// before it.
+func drain(p Plan, start, end []float64) int {
+	last := len(p.Steps) - 1
+	if last < 1 {
+		return 0
+	}
+	final := p.Steps[last].World
+	until := end[last]
+	for j := 0; j < last; j++ {
+		w := p.Steps[j].World
+		if !sameNames(w.ParentNS, final.ParentNS) && end[j]+float64(p.TTL.NSParent) > until {
+			until = end[j] + float64(p.TTL.NSParent)
+		}
+		if !sameKeys(w.ParentDS, final.ParentDS) {
+			ttl := p.TTL.DS
+			if len(w.ParentDS) == 0 {
+				ttl = p.TTL.Neg
+			}
+			if end[j]+float64(ttl) > until {
+				until = end[j] + float64(ttl)
+			}
+		}
+		for name, prov := range w.Providers {
+			if !prov.Serving || len(prov.DNSKEY) == 0 || sameKeys(prov.DNSKEY, final.Providers[name].DNSKEY) {
+				continue
+			}
+			if t := lastReach(p, j, name, start, end) + float64(p.TTL.DNSKEY); t > until {
+				until = t
+			}
+		}
+	}
+	return int(until - end[last])
 }
 
 // evaluate classifies the answers a resolver gets from server, given where its NS and DS came from, for every

@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lostname.be/schemas/config.schema.json",
+  "title": "lostname configuration",
+  "description": "Every deployment setting Lostname uses. The defaults are built in (`lostname config` prints them); a file passed with --config is applied on top and may name only the keys it changes. Unknown keys are refused.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "const": "lostname.config/v0"
+    },
+    "sim": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ttls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ds_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "negative_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ns_parent_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "dnskey_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "margin_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "locks": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "latency_seconds": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "window_seconds": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "description": "where the numbers come from"
+              }
+            }
+          }
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "canary": {
+          "type": "string",
+          "description": "IPv4 host:port where no DNS server can exist"
+        },
+        "canary_v6": {
+          "type": "string",
+          "description": "[IPv6]:port where no DNS server can exist"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "parity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "edns_buffer_bytes": {
+          "type": "integer",
+          "minimum": 512,
+          "maximum": 4096
+        },
+        "nx_probe_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "enum": [
+            "T0",
+            "T1",
+            "T2"
+          ]
+        },
+        "deadline_seconds": {"type": "integer", "minimum": 1, "description": "the whole parity run; questions after it are gaps (no verdict)"},
+        "max_queries_per_server": {"type": "integer", "minimum": 1, "description": "per server address; questions after it are gaps (no verdict)"},
+        "pace_milliseconds": {"type": "integer", "minimum": 0, "maximum": 60000, "description": "the least time between two queries to one server address"},
+        "min_signature_life_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "a valid RRSIG that expires sooner than this is a risk. Online signers return fresh signatures with short lives, so the default is 6 hours; raise it for a zone signed offline"
+        }
+      }
+    },
+    "fetch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "deadline_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_records": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "lint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disabled_rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^L-[0-9]{2}$"
+          }
+        },
+        "severity": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "blocker",
+              "risk",
+              "note"
+            ]
+          }
+        }
+      }
+    },
+    "watch": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "lostname watch: the zones it checks every round, and where /metrics is served",
+      "properties": {
+        "listen": {
+          "type": "string",
+          "description": "host:port for /metrics; the default listens on loopback only"
+        },
+        "interval_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "zones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "origin",
+              "zone_file"
+            ],
+            "properties": {
+              "origin": {
+                "type": "string",
+                "minLength": 1
+              },
+              "zone_file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "providers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "addrs"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "addrs": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "parent": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exit": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["model", "lock", "target_seconds"],
+                "description": "exit readiness (OB-2): the exit under this model and registry lock must take at most target_seconds, caches drained",
+                "properties": {
+                  "model": {"enum": ["T0", "T1", "T2"]},
+                  "lock": {"type": "string", "description": "a profile in sim.locks"},
+                  "target_seconds": {"type": "integer", "minimum": 1}
+                }
+              }
+            }
+          }
+        },
+        "catalogs": {
+          "type": "array",
+          "description": "catalog zones (RFC 9432): every member is checked like a zone, with the catalog's providers, parent and exit objective; member zone files are <zone_dir>/<member>.zone",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["catalog_file", "origin", "zone_dir"],
+            "properties": {
+              "catalog_file": {"type": "string", "minLength": 1},
+              "origin": {"type": "string", "minLength": 1},
+              "zone_dir": {"type": "string", "minLength": 1},
+              "providers": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "addrs"], "properties": {"name": {"type": "string", "minLength": 1}, "addrs": {"type": "array", "minItems": 1, "items": {"type": "string"}}}}},
+              "parent": {"type": "array", "items": {"type": "string"}},
+              "exit": {"type": "object", "additionalProperties": false, "required": ["model", "lock", "target_seconds"], "properties": {"model": {"enum": ["T0", "T1", "T2"]}, "lock": {"type": "string"}, "target_seconds": {"type": "integer", "minimum": 1}}}
+            }
+          }
+        },
+        "otlp_endpoint": {
+          "type": "string",
+          "description": "OTLP/HTTP base URL (metrics go to /v1/metrics); empty for no push"
+        },
+        "events": {
+          "type": "array",
+          "description": "event transports: http sends CloudEvents to events_endpoint, otlp sends them as OTLP logs to otlp_endpoint; none by default",
+          "items": {
+            "enum": ["http", "otlp"]
+          }
+        },
+        "events_endpoint": {
+          "type": "string",
+          "description": "URL that receives CloudEvents over HTTP (structured mode)"
+        },
+        "state_file": {
+          "type": "string",
+          "description": "where the event tracker keeps its state across restarts (written atomically after each round; owner names, rule ids and verdicts only); needs events"
+        },
+        "zone_id": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "the keyed-hash zone label: with a salt file, every label, event subject and span carries HMAC-SHA-256(salt, zone) instead of the zone's name, and owner names are relative to the zone",
+          "properties": {
+            "salt_file": {"type": "string", "description": "a file holding at least 16 bytes of secret salt; empty for raw zone names"}
+          }
+        },
+        "traces": {
+          "type": "boolean",
+          "description": "send each check run as an OpenTelemetry trace (a span per DNS query) to otlp_endpoint"
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9._-]{1,64})?$",
+          "description": "the events' source is lostname/<instance>; empty for the host name"
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "optional correlation attributes, sent as OTLP resource attributes",
+          "properties": {
+            "site": {
+              "type": "string"
+            },
+            "tenant": {
+              "type": "string"
+            },
+            "entity_id": {
+              "type": "string"
+            },
+            "risk_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

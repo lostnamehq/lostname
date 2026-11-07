@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lostname.be/schemas/parity-report.schema.json",
+  "title": "lostname parity report",
+  "description": "Output of `lostname parity --json`. No timestamps. Verdict: fail when any finding is fail; no_verdict when a question got no usable authoritative answer (see gaps) or the path is intercepted; pass only with full coverage. Severities: fail decides the verdict, risk and note never do. Lint's blocker corresponds to parity's fail.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "origin",
+    "model",
+    "reference",
+    "providers",
+    "questions",
+    "intercepted",
+    "verdict",
+    "findings",
+    "gaps"
+  ],
+  "properties": {
+    "schema": {
+      "const": "lostname.parity/v0"
+    },
+    "origin": {
+      "type": "string"
+    },
+    "model": {
+      "enum": [
+        "T0",
+        "T1",
+        "T2"
+      ],
+      "description": "transition model: apex NS may differ in T0 and T1, must match in T2"
+    },
+    "reference": {
+      "type": "string",
+      "description": "the provider the others are compared with (the first given)"
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "addrs"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "addrs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "questions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "intercepted": {
+      "type": "boolean",
+      "description": "a probe address answered: no measurement over this path is trusted"
+    },
+    "interception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probe", "protocols"],
+      "description": "present when intercepted: the probe address that answered and the protocols it answered over",
+      "properties": {
+        "probe": {"type": "string"},
+        "protocols": {"type": "array", "minItems": 1, "items": {"enum": ["udp", "tcp"]}}
+      }
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "no_verdict"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "kind",
+          "name",
+          "type",
+          "provider",
+          "detail"
+        ],
+        "properties": {
+          "severity": {
+            "enum": [
+              "fail",
+              "risk",
+              "note"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "apex-ns-differs",
+              "shared-fate",
+              "cds-differs",
+              "cds-one-sided",
+              "cds-cdnskey-differ",
+              "referral-denial-missing",
+              "child-served",
+              "denial-invalid",
+              "denial-missing",
+              "denial-type-differs",
+              "dnskey-not-signed-by-ds-key",
+              "dnskey-transport-differs",
+              "ds-no-matching-key",
+              "ds-without-dnskey",
+              "ent-has-data",
+              "ent-nxdomain",
+              "inconsistent-servers",
+              "nx-probe",
+              "nx-probe-wildcard",
+              "parent-no-ds",
+              "record-missing",
+              "referral-differs-zone",
+              "rrset-differs",
+              "rrsig-expired",
+              "rrsig-expires-soon",
+              "rrsig-invalid",
+              "rrsig-missing",
+              "rrsig-not-yet-valid",
+              "rrsig-revoked-key",
+              "rrsig-unknown-key",
+              "serial-drift",
+              "soa-minimum-differs",
+              "soa-missing",
+              "soa-timer-differs",
+              "ttl-differs",
+              "ttl-differs-zone",
+              "txt-split-differs",
+              "txt-split-differs-zone",
+              "wildcard-proof-missing",
+              "zone-differs"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider",
+          "addr",
+          "transport",
+          "name",
+          "type",
+          "reason"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "addr": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "queries": {
+      "type": "object",
+      "description": "per server address, how many queries the run sent to it (the parent's servers included)",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "signature_expiry": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "description": "per provider, the earliest expiration (Unix seconds) of a valid RRSIG it served; absent when none"
+    }
+  }
+}

@@ -5,11 +5,14 @@
 # internal  = never leaves this repository
 # A tracked file that matches nothing blocks the commit (tools/public_check.py).
 internal  private/*
+internal  kit.yaml
 internal  m0/runs/*
 generated docs/model.md
 generated docs/prior-art.md
 public    docs/*
 public    README.md
+public    Dockerfile
+public    lostname.allowed_signers
 public    ROADMAP.md
 public    CONTRIBUTING.md
 public    SECURITY.md
@@ -31,6 +34,7 @@ public    model/*
 public    cmd/*
 verbatim  site/fonts/OFL.txt
 public    site/*
+public    deploy/*
 public    internal/*
 public    .gitattributes
 public    .github/*

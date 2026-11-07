@@ -1,0 +1,52 @@
+{
+  "schema": "lostname.lint/v0",
+  "origin": "example.test.",
+  "source": "zonefile:INPUT",
+  "records": 12,
+  "verdict": "fail",
+  "counts": {
+    "blocker": 2,
+    "note": 1,
+    "risk": 1
+  },
+  "findings": [
+    {
+      "rule": "L-02",
+      "severity": "blocker",
+      "name": "example.test.",
+      "type": "SOA",
+      "message": "HETZNER_V2 does not serve SOA records: they are lost in the move",
+      "ref": "DNSControl v5.7.0 provider matrix"
+    },
+    {
+      "rule": "L-07",
+      "severity": "note",
+      "name": "example.test.",
+      "type": "CAA",
+      "message": "CAA issue \"letsencrypt.org\" has no accounturi: any account at that CA may issue",
+      "ref": "RFC 8657"
+    },
+    {
+      "rule": "L-11",
+      "severity": "blocker",
+      "name": "shop.example.test.",
+      "type": "NS",
+      "message": "the delegation names ns1.dns-host.example., a server of the current DNS provider: after the exit it is lame unless shop.example.test. moves too",
+      "ref": "Lostname model section 3"
+    },
+    {
+      "rule": "L-12",
+      "severity": "risk",
+      "name": "www.example.test.",
+      "type": "CNAME",
+      "message": "CNAME points at proxy.dns-host.example., under dns-host.example, the current DNS provider's own domain: check that it keeps working after the exit",
+      "ref": "Lostname model section 3"
+    }
+  ],
+  "target": {
+    "provider": "HETZNER_V2",
+    "matrix": "DNSControl v5.7.0",
+    "commit": "f47338b466ef4465f01e7695bb3173063ac5d1f1",
+    "released": "2026-10-21"
+  }
+}

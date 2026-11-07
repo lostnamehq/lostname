@@ -20,7 +20,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SECTIONS = ("added", "changed", "deprecated", "removed", "fixed", "security")    # Keep a Changelog 1.1.0 order
+# Keep a Changelog 1.1.0 order, after "upgrading": what a user must do or know before taking the release (plan v0.1)
+SECTIONS = ("upgrading", "added", "changed", "deprecated", "removed", "fixed", "security")
 NAME = re.compile(r"^(?P<id>[a-z0-9][a-z0-9-]*)\.(?P<section>[a-z]+)\.md$")
 VERSION = re.compile(r"^\d+\.\d+\.\d+$")
 WIDTH = 120

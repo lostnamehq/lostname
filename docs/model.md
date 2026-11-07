@@ -1,5 +1,5 @@
 <!-- Generated from private/src/model.md by tools/publicize.py. Edit the source, not this file. -->
-# Lostname model (draft 2, 2026-11-05)
+# Lostname model (draft 3, 2026-11-06)
 
 Lostname lets a zone owner, or the IT partner acting for them, prove they can leave their DNS provider. This document fixes the vocabulary, data model, rules, timing and threats. Every rule traces to a finding of the M0 lab (`m0/FINDINGS.md`, F1-F9) or to a standard (`references.md`).
 
@@ -12,7 +12,7 @@ Release order and status are in `../ROADMAP.md`.
 - **P2. Build on, never replace.** DNSControl (pinned version, absolute path, checksum verified on every call) does export, import and push. Lostname reads `print-ir`, `get-zones` and `preview --report` and queries authoritative servers itself.
 - **P3. The owner acts, Lostname advises.** Read-only until `drill --apply` (later release). Lostname never opens `creds.json`.
 - **P4. Facts with provenance.** Every fact records its source (server, address and transport, or file and line), its time and the tool versions. Capabilities record their date and the evidence behind them; older than 12 months becomes `unknown`.
-- **P5. Evidence as a by-product.** Every command writes a bundle with a manifest, good result or bad.
+- **P5. Evidence as a by-product.** A check can leave a bundle with a manifest, good result or bad: `--evidence DIR` on `lint` and `parity` in v0.1; signed bundles and the other commands follow (D4, v0.3).
 
 ## 2. Entities
 | Entity | Fields | Source |
@@ -29,27 +29,48 @@ Release order and status are in `../ROADMAP.md`.
 | `EvidenceBundle` | inputs, snapshots, findings, plan, parity, versions, `MANIFEST.sha256`, optional RFC 3161 token | every command |
 
 ## 3. Lint rules
+| Id | Rule | Severity | Basis | Where |
+|---|---|---|---|---|
+| L-00 | Not a zone: no records, no single apex SOA, or no apex NS | blocker, cannot be disabled | RFC 1035 5.2 | `lint` |
+| L-01 | Target needs an SOA in the config and none is present: push deletes it, the zone stops serving | blocker | F2, U-12 | `lint` |
+| L-02 | Record type unsupported by the target | blocker | DNSControl matrix | `lint` |
+| L-03 | ALIAS/ANAME present (not standard, not portable, semantics differ) | risk; blocker if the target is `none` | F5, F6 | `lint` |
+| L-04 | DNSSEC intent missing from the config while the source signs | blocker for an exit | F1, F3 | `lint` |
+| L-05 | Provider metadata the target needs is missing (e.g. `default_ns`) | risk | F1 | v0.2 (needs provider data) |
+| L-06 | TTL outside the target's limits | risk | provider limits | v0.2 (needs provider data) |
+| L-07 | CAA without `accounturi`, or tied to a provider-held ACME account | note / risk | RFC 8657 | `lint` (risk variant: v0.2) |
+| L-08 | CNAME at the apex, or a CNAME next to other data (only DNSSEC records may share the owner) | blocker | RFC 1034 3.6.2, RFC 2181 10.1 | `lint` |
+| L-09 | In-domain delegation without glue (referrals must carry all available in-domain glue, or set TC=1) | blocker | RFC 9471 sec 3.1 | `lint` |
+| L-10 | Provider-specific metadata (proxy, geo, weighted) dropped on export | risk | F1 | `lint` |
+| L-11 | Sub-delegation NS pointing at the old provider's servers: lame after the exit | blocker | C | `lint` |
+| L-12 | Targets on the provider's own names (`*.provider-dns.*`, proxy, redirect or mail-forwarding hosts) | risk | C | `lint` |
+| L-13 | SVCB/HTTPS AliasMode (SvcPriority 0) or SvcParams the target lacks | risk | RFC 9460 | `lint` |
+| L-14 | CAA with the critical flag and an unknown or unsupported tag (a CA must not issue) | risk | RFC 8659 4.1 | `lint` |
+| L-15 | Fewer than two apex NS after the move | risk | C | `lint` |
+| L-16 | Responses near the EDNS limit (large DNSKEY or TXT) that truncate; TXT split differently | note | C | `lint` |
+| L-17 | No common signing algorithm (or common set of algorithms) at the two providers | blocker for T2 and T3 | RFC 8901 sec 4 | v0.2 (needs provider data) |
+| L-18 | DNAME present, or MX/NS pointing at an alias | risk | RFC 2181 10.3 | `lint` |
+| L-19 | CDS published while the parent scans CDS, and the two providers' CDS differ (in model 2 CDS/CDNSKEY must be cross-imported) | blocker | RFC 8901 secs 8-9, model 2 | `parity` |
+| L-20 | Shared fate: nameservers that share an address, a /24 or a /48 (AS numbers: v0.2, RL-3) | risk | RFC 2182 3.1 | `lint` (glue), `parity` (between providers) |
+| L-21 | DNSSEC algorithms and digests that must not or should not be used (DNSKEY, CDNSKEY, DS, CDS) | risk / note | RFC 8624 3.1 | `lint` |
+| L-22 | DANE TLSA on a mail host: does nothing unsigned; when signed, a bogus DNSSEC handover defers mail | risk unsigned, note signed | RFC 7672 2.2 | `lint` |
+
+### 3b. Mail records (`lostname mail`, decision 0011)
+Read offline from the zone; only names the zone contains (DKIM selectors are never guessed); findings never quote record data.
+
 | Id | Rule | Severity | Basis |
 |---|---|---|---|
-| L-01 | Target needs an SOA in the config and none is present: push deletes it, the zone stops serving | blocker | F2, U-12 |
-| L-02 | Record type unsupported by the target | blocker | DNSControl matrix |
-| L-03 | ALIAS/ANAME present (not standard, not portable, semantics differ) | risk; blocker if the target is `none` | F5, F6 |
-| L-04 | DNSSEC intent missing from the config while the source signs | blocker for an exit | F1, F3 |
-| L-05 | Provider metadata the target needs is missing (e.g. `default_ns`) | risk | F1 |
-| L-06 | TTL outside the target's limits | risk | provider limits |
-| L-07 | CAA without `accounturi`, or tied to a provider-held ACME account | note / risk | RFC 8657 |
-| L-08 | CNAME at the apex, or a CNAME next to other data (only DNSSEC records may share the owner) | blocker | RFC 1034 3.6.2, RFC 2181 10.1 |
-| L-09 | In-domain delegation without glue (referrals must carry all available in-domain glue, or set TC=1) | blocker | RFC 9471 sec 3.1 |
-| L-10 | Provider-specific metadata (proxy, geo, weighted) dropped on export | risk | F1 |
-| L-11 | Sub-delegation NS pointing at the old provider's servers: lame after the exit | blocker | C |
-| L-12 | Targets on the provider's own names (`*.provider-dns.*`, proxy, redirect or mail-forwarding hosts) | risk | C |
-| L-13 | SVCB/HTTPS AliasMode (SvcPriority 0) or SvcParams the target lacks | risk | RFC 9460 |
-| L-14 | CAA with the critical flag and an unknown or unsupported tag (a CA must not issue) | risk | RFC 8659 4.1 |
-| L-15 | Fewer than two apex NS after the move | risk | C |
-| L-16 | Responses near the EDNS limit (large DNSKEY or TXT) that truncate; TXT split differently | note | C |
-| L-17 | No common signing algorithm (or common set of algorithms) at the two providers | blocker for T2 and T3 | RFC 8901 sec 4 |
-| L-18 | DNAME present, or MX/NS pointing at an alias | risk | RFC 2181 10.3 |
-| L-19 | CDS published while the parent scans CDS, and the two providers' CDS differ (in model 2 CDS/CDNSKEY must be cross-imported) | blocker | RFC 8901 secs 8-9, model 2 |
+| M-01 | More than one SPF record: receivers apply none | blocker | RFC 7208 4.5 |
+| M-02 | The SPF record does not parse | blocker | RFC 7208 4.6 |
+| M-03 | SPF ends in `+all` (or a bare `all`) | risk | RFC 7208 5.1 |
+| M-04 | SPF uses `ptr` | note | RFC 7208 5.5 |
+| M-05 | More than one DMARC record | blocker | RFC 9989 |
+| M-06 | DMARC does not parse (blocker), or has no valid `p` (risk) | blocker / risk | RFC 9989 |
+| M-07 | DMARC `p=none` | note | RFC 9989 |
+| M-08 | A DKIM key record that does not parse, is not base64, or is not the only TXT at its selector | risk | RFC 6376 3.6 |
+| M-09 | MTA-STS record missing `v=STSv1` first, a bad `id`, or more than one record | risk | RFC 8461 3.1 |
+| M-10 | TLS-RPT record without valid `rua` destinations, or more than one record | risk | RFC 8460 3 |
+| M-11 | SMTP TLSA with undefined parameters (risk) or a PKIX usage (note) | risk / note | RFC 6698 2.1, RFC 7672 3.1.3 |
 
 ## 4. Parity
 - **Coverage:** every (name, type) in the union of the IR and both exports, plus probes: apex SOA, NS, DNSKEY, CDS/CDNSKEY; a random NXDOMAIN name; a random label under every wildcard owner (tests synthesis, C); every empty non-terminal; DS at every cut.
@@ -139,20 +160,27 @@ Timing reference: RFC 6781 section 4.3.5 for changing DNS operators: 4.3.5.1 for
 - **S3: registry locks cost one unlock per parent change on .be** (`internal/sim/schedule.go`).
   - **Domain Shield:** its 24-hour unlock never covers two parent changes, because every plan waits at least a DS or NS TTL (one day) plus a margin between them.
   - **Domain Guard:** each change request needs its own phone confirmation.
-  - Planning assumptions (to be replaced by stated or measured times): Shield 4 h per unlock, Guard 2 days.
+  - Planning assumptions (to be replaced by stated or measured times): Shield 4 h per unlock; Guard 2 working days, planned as 4 calendar days, the upper bound across a weekend (asked Friday evening, answered Tuesday evening). Public holidays add to it.
 
   | Plan | Parent changes | No lock | Shield | Guard |
   |---|---|---|---|---|
-  | T1 | 3 | 52 h | 64 h | 196 h |
-  | T2 | 4 | 103 h | 119 h | 295 h |
-  | KSK roll, double-DS | 2 | 27 h | 35 h | 123 h |
-  | KSK roll, double-signature | 1 | 27 h | 31 h | 75 h |
+  | T1 | 3 | 52 h | 64 h | 340 h |
+  | T2 | 4 | 103 h | 119 h | 487 h |
+  | KSK roll, double-DS | 2 | 27 h | 35 h | 219 h |
+  | KSK roll, double-signature | 1 | 27 h | 31 h | 123 h |
 
   **Consequences:**
   - Exit time (D1) includes the lock.
   - `plan` asks for the lock state and schedules the unlock requests.
   - `lint` notes a lock it can see, through the registrar's EPP status codes or the owner's statement.
-- **S4: under a lock, prefer the plan with fewer parent changes.** A double-signature roll changes the parent once, against twice for double-DS. Under Guard it takes 75 h against 123 h, and it needs one phone call instead of two. Without a lock, both take the same time. `plan` picks the method by lock state.
+- **S4: under a lock, prefer the plan with fewer parent changes.** A double-signature roll changes the parent once, against twice for double-DS. Under Guard it takes 123 h against 219 h, and it needs one phone call instead of two. Without a lock, both take the same time. `plan` picks the method by lock state.
+- **A plan ends when the caches drain, not at its last step.** After the last step a resolver can still hold an earlier step's parent NS, DS or DNSKEY for one TTL. The explorer reports this drain time, and the exit time includes it: after a KSK roll by double-DS the old DS lives one DS TTL (a day on .be) past its removal. Every report also lists the resolver assumptions its verdict rests on (no serve-stale beyond the TTL, RFC 2308 negative caching, DNSKEY from a reachable server, timers from observed publication).
+- **Pre-staging the DNSKEY TTL (RL-4) pays off for multi-signer exits, not for the insecure swap.** The owner controls the DNSKEY TTL; the parent's DS and NS TTLs are the registry's. With a day-long DNSKEY TTL lowered to 5 minutes (.be parent values, the safe waits of S1 and S2, caches drained):
+  - T2 shortens from 173 h to 101 h, three DNSKEY TTLs gained for one TTL of pre-stage wait: worth it;
+  - T1 shortens from 75 h to 51 h, a little less than the 24 h pre-stage wait: no gain in elapsed time, but a shorter unsigned period;
+  - T0 gains nothing.
+
+  Every plan stays safe at the lower TTL (explored, not assumed). The child's apex NS TTL is not modelled yet.
 - **Timers start when a change is observed, not when it is requested.** The parent's publication delay `Dp` is not a constant to assume: `plan` polls every parent server (authoritatively, P1) until the change is visible at all of them, and only then starts the step's wait. This removes `Dp` from the timing formulas. What remains is the measured time, which the evidence bundle records.
 
 ## 6. Evidence bundle
@@ -171,8 +199,13 @@ Exit codes: 0 = ok; 1 = findings at or above the threshold; 2 = no verdict (P1, 
 
 | Command | Release | Exits 1 when |
 |---|---|---|
-| `lint [--to P]` | v0.1 | any blocker (or a risk with `--strict`) |
-| `parity --providers A,B [--model T0\|T1\|T2]` | v0.1 | any failure in section 4 |
+| `config` | v0.1 | never (exit 3 on an invalid file) |
+| `doctor` | v0.1 | a check fails (2 when the path is intercepted) |
+| `lint --zone F\|--dnscontrol-ir F [--to P]` | v0.1 | any blocker (or a risk with `--strict`) |
+| `fetch --axfr HOST:PORT` | v0.1 | never; exit 2 when the transfer cannot be trusted |
+| `parity --provider A=ADDR[,ADDR] --provider B=... [--parent ADDR] [--model T0\|T1\|T2]` | v0.1 | any failure in section 4 |
+| `mail --zone F\|--dnscontrol-ir F` | v0.1 | any blocker (or a risk with `--strict`) |
+| `watch [--once]` | v0.1 | with `--once`, the worst verdict (2 when any check has none) |
 | `plan --from A --to B` | v0.2 | no safe model |
 | `drill` (read-only), `report` | v0.3 | preconditions fail / never |
 | `drill --apply` | later | preconditions or parity after a step fail |
@@ -189,7 +222,10 @@ Exit codes: 0 = ok; 1 = findings at or above the threshold; 2 = no verdict (P1, 
 | Registrar or registry lock blocks the NS or DS change | major | `ParentState.locks`; an unknown lock makes `Dp` unknown |
 | Registrar delays DS removal, or restores it from CDS | major | precondition "confirmed at the parent's servers"; L-19 and the CDS delete step |
 | Dangling delegation: A's zone or account is deleted while A's NS is still cached, and someone claims the zone at A | major | "decommission A" only after the NS waits and after A's apex NS points to B; a check that A answers REFUSED |
-| Credential exposure | major | never open `creds.json`; a test asserts no read; no network beyond DNSControl and DNS queries |
+| Credential exposure | major | never open `creds.json`; a test asserts no read; `lint`, `mail` and the zone reader make no network calls (their packages import no network package; decision 0008) |
+| Data sent to an endpoint the deployer did not mean (`watch` posts OTLP and CloudEvents to configured URLs) | major | endpoints only from the config, http or https only, no redirects followed to another host; events and spans carry owner names and types, never record data (tests) |
+| `/metrics` read by anyone on the network | minor | loopback by default (`watch.listen`); GET and HEAD only; bounded labels; timeouts on every connection |
+| Zone names visible across tenants in a shared stack | minor | the keyed-hash zone label (`watch.zone_id`): HMAC-SHA-256 under a secret salt replaces the zone everywhere `watch` emits; a test checks every way out |
 | Substituted DNSControl binary | minor | absolute path and a checksum on every call |
 | Stale capability data | minor | P4 expiry |
 
@@ -198,11 +234,11 @@ Lostname does not:
 - host DNS;
 - sign zones;
 - store credentials;
-- monitor continuously;
+- run hosted monitoring: `watch` runs in the owner's environment and emits into their own stack (decision 0007, `docs/observability.md`);
 - fix zones automatically;
 - call provider APIs (DNSControl does);
 - scan third parties;
-- check SPF lookup counts or mail policy (they don't change with a provider move; trust-checks covers them).
+- judge mail policy in `lint` or `parity` (it doesn't change with a provider move). `lostname mail` reads the zone's mail records offline (decision 0011), and doesn't count SPF lookups, which needs the network.
 
 ## 10. Prior art (gh pass 2026-11-05)
 | Project | What it does | Why Lostname differs |

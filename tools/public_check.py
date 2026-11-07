@@ -52,12 +52,47 @@ def patterns() -> list[re.Pattern]:
     for line in deny.read_text(encoding="utf-8").splitlines():
         if line.strip() and not line.startswith("#"):
             pats.append(re.compile(line.strip(), re.I))
-    names = os.environ.get("LOSTNAME_NAMES_FILE")
-    if names and Path(names).is_file():
-        for n in Path(names).read_text(encoding="utf-8").splitlines():
+    names = names_file()
+    if names and names.is_file():
+        for n in names.read_text(encoding="utf-8").splitlines():
             if n.strip():
-                pats.append(re.compile(re.escape(n.strip()), re.I))
+                # Whole words only: a company name must not block ordinary words that contain it.
+                pats.append(re.compile(r"(?<![\w.-])" + re.escape(n.strip()) + r"(?![\w-])", re.I))
     return pats
+
+
+def names_file() -> Path | None:
+    """The client-names list: LOSTNAME_NAMES_FILE, else ~/.config/lostname/names.txt, one name per line, kept
+    outside every repository."""
+    env = os.environ.get("LOSTNAME_NAMES_FILE")
+    if env:
+        return Path(env)
+    default = Path.home() / ".config" / "lostname" / "names.txt"
+    return default if default.is_file() else None
+
+
+def names_problem() -> str | None:
+    """Red team 2, C4: a names file that is set but missing is an error, never a silently skipped check."""
+    names = os.environ.get("LOSTNAME_NAMES_FILE")
+    if names and not Path(names).is_file():
+        return f"NAMES LOSTNAME_NAMES_FILE={names} does not exist: the client-names check cannot run"
+    return None
+
+
+def scan_text(rel: str, text: str, pats) -> list[str]:
+    """Denylist hits per line, plus hits that only appear once line breaks are joined (red team 2, C5: Markdown
+    renders a wrapped line as one, so a term split across two lines is still published)."""
+    problems, per_line = [], {}
+    for n, line in enumerate(text.splitlines(), 1):
+        for pat in pats:
+            if pat.search(line):
+                per_line[pat.pattern] = per_line.get(pat.pattern, 0) + 1
+                problems.append(f"DENY {rel}:{n}: /{pat.pattern}/ in: {line.strip()[:100]}")
+    flat = re.sub(r"\s+", " ", text)
+    for pat in pats:
+        if len(pat.findall(flat)) > per_line.get(pat.pattern, 0):
+            problems.append(f"DENY {rel}: /{pat.pattern}/ across a line break")
+    return problems
 
 
 def scan_tree(base: Path, rules) -> list[str]:
@@ -69,10 +104,7 @@ def scan_tree(base: Path, rules) -> list[str]:
             continue
         if classify(rel, rules) == "verbatim":
             continue
-        for n, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-            for pat in pats:
-                if pat.search(line):
-                    problems.append(f"DENY {rel}:{n}: /{pat.pattern}/ in: {line.strip()[:100]}")
+        problems += scan_text(rel, p.read_text(encoding="utf-8", errors="replace"), pats)
     return problems
 
 
@@ -87,11 +119,12 @@ def main() -> int:
             continue
         if cls in ("internal", "verbatim") or path.lower().endswith(BINARY):
             continue
-        text = (ROOT / path).read_text(encoding="utf-8", errors="replace")
-        for n, line in enumerate(text.splitlines(), 1):
-            for p in pats:
-                if p.search(line):
-                    problems.append(f"DENY {path}:{n}: /{p.pattern}/ in: {line.strip()[:100]}")
+        if (ROOT / path).is_symlink():  # red team 2, C3: the content would come from the link's target
+            problems.append(f"SYMLINK {path}: a public path may not be a symbolic link")
+            continue
+        problems += scan_text(path, (ROOT / path).read_text(encoding="utf-8", errors="replace"), pats)
+    if why := names_problem():
+        problems.append(why)
     gen = subprocess.run([sys.executable, str(ROOT / "tools" / "publicize.py"), "--check"], cwd=ROOT,
                          capture_output=True, text=True)
     if gen.returncode:

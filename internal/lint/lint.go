@@ -35,7 +35,7 @@ type Finding struct {
 
 type check func(z *zone.Zone) []Finding
 
-var checks = []check{l00, l07, l08, l09, l13, l14, l15, l18, l21}
+var checks = []check{l00, l07, l08, l09, l10, l11, l12, l13, l14, l15, l16, l18, l20, l21, l22}
 
 // L-00 (M8): the input must be a zone at all: records, exactly one SOA at the apex and an apex NS set. Without them
 // every other check passes vacuously, and an exit built on the input would serve nothing.
@@ -58,29 +58,40 @@ func l00(z *zone.Zone) []Finding {
 var (
 	algMustNot        = map[uint8]string{1: "RSAMD5", 3: "DSA", 6: "DSA-NSEC3-SHA1", 12: "ECC-GOST"}
 	algNotRecommended = map[uint8]string{5: "RSASHA1", 7: "RSASHA1-NSEC3-SHA1", 10: "RSASHA512"}
+	digestMustNot     = map[uint8]string{dns.SHA1: "SHA-1", dns.GOST94: "GOST R 34.11-94"} // RFC 8624 section 3.3
 )
 
-// L-21 (RL-2): DNSKEY algorithms that must not or should not be used for signing, and DS records with a SHA-1
-// digest, which RFC 8624 section 3.3 says must not be used for delegations. A move is the moment to fix them,
-// because the new signer may not support them at all.
+// L-21 (RL-2): DNSKEY and CDNSKEY algorithms that must not or should not be used for signing, and DS and CDS records
+// with a digest that RFC 8624 section 3.3 says must not be used for delegations (SHA-1, GOST R 34.11-94). A move is
+// the moment to fix them, because the new signer may not support them at all; a CDS or CDNSKEY asks the parent to
+// publish exactly that.
 func l21(z *zone.Zone) []Finding {
 	var out []Finding
+	key := func(r zone.Record, typ string, alg uint8, tag uint16) {
+		if name, bad := algMustNot[alg]; bad {
+			out = append(out, Finding{"L-21", Risk, r.Name, typ,
+				"key tag " + strconv.Itoa(int(tag)) + " uses " + name + ", which must not be used for signing", "RFC 8624 3.1"})
+		} else if name, weak := algNotRecommended[alg]; weak {
+			out = append(out, Finding{"L-21", Note, r.Name, typ,
+				"key tag " + strconv.Itoa(int(tag)) + " uses " + name + ", not recommended for signing", "RFC 8624 3.1"})
+		}
+	}
+	digest := func(r zone.Record, typ string, d uint8, tag uint16) {
+		if name, bad := digestMustNot[d]; bad {
+			out = append(out, Finding{"L-21", Risk, r.Name, typ, typ + " for key tag " + strconv.Itoa(int(tag)) +
+				" uses a " + name + " digest, which must not be used for delegations", "RFC 8624 3.3"})
+		}
+	}
 	for _, r := range z.Records {
 		switch v := r.RR().(type) {
 		case *dns.DNSKEY:
-			if name, bad := algMustNot[v.Algorithm]; bad {
-				out = append(out, Finding{"L-21", Risk, r.Name, "DNSKEY",
-					"key tag " + strconv.Itoa(int(v.KeyTag())) + " uses " + name + ", which must not be used for signing", "RFC 8624 3.1"})
-			} else if name, weak := algNotRecommended[v.Algorithm]; weak {
-				out = append(out, Finding{"L-21", Note, r.Name, "DNSKEY",
-					"key tag " + strconv.Itoa(int(v.KeyTag())) + " uses " + name + ", not recommended for signing", "RFC 8624 3.1"})
-			}
+			key(r, "DNSKEY", v.Algorithm, v.KeyTag())
+		case *dns.CDNSKEY:
+			key(r, "CDNSKEY", v.Algorithm, v.KeyTag())
 		case *dns.DS:
-			if v.DigestType == dns.SHA1 {
-				out = append(out, Finding{"L-21", Risk, r.Name, "DS",
-					"DS for key tag " + strconv.Itoa(int(v.KeyTag)) + " uses a SHA-1 digest, which must not be used for delegations",
-					"RFC 8624 3.3"})
-			}
+			digest(r, "DS", v.DigestType, v.KeyTag)
+		case *dns.CDS:
+			digest(r, "CDS", v.DigestType, v.KeyTag)
 		}
 	}
 	return out
@@ -92,6 +103,11 @@ func Run(z *zone.Zone) []Finding {
 	for _, c := range checks {
 		out = append(out, c(z)...)
 	}
+	return Sorted(out)
+}
+
+// Sorted puts findings in the stable report order: by rule, then name, then message.
+func Sorted(out []Finding) []Finding {
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		if a.Rule != b.Rule {

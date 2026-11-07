@@ -1,0 +1,287 @@
+{
+ "versions": {
+  "collector": "docker.io/otel/opentelemetry-collector-contrib:0.163.2",
+  "prometheus": "docker.io/prom/prometheus:v3.15.1",
+  "victoriametrics": "docker.io/victoriametrics/victoria-metrics:v1.154.1"
+ },
+ "results": [
+  {
+   "q": "lostname_lint_findings{zone=\"seen.test.\",severity=\"blocker\"}",
+   "want": 1,
+   "prometheus": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_lint_findings{zone=\"seen.test.\",severity=\"risk\"}",
+   "want": 2,
+   "prometheus": {
+    "got": [
+     2.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     2.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_lint_findings{zone=\"seen.test.\",severity=\"note\"}",
+   "want": 3,
+   "prometheus": {
+    "got": [
+     3.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     3.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_check_verdict{zone=\"seen.test.\",check=\"parity\",lostname_check_verdict=\"fail\"}",
+   "want": 1,
+   "prometheus": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_check_verdict{zone=\"seen.test.\",check=\"parity\",lostname_check_verdict=\"pass\"}",
+   "want": 0,
+   "prometheus": {
+    "got": [
+     0.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     0.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_check_duration_seconds{zone=\"seen.test.\",check=\"parity\"}",
+   "want": 5,
+   "prometheus": {
+    "got": [
+     5.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     5.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_parity_mismatches{zone=\"seen.test.\",provider_a=\"A\",provider_b=\"B\"}",
+   "want": 2,
+   "prometheus": {
+    "got": [
+     2.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     2.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_parity_servers_answering{zone=\"seen.test.\",provider=\"B\"}",
+   "want": 1,
+   "prometheus": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_parity_servers_expected{zone=\"seen.test.\",provider=\"B\"}",
+   "want": 2,
+   "prometheus": {
+    "got": [
+     2.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     2.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_dnssec_status{zone=\"seen.test.\",provider=\"B\",lostname_dnssec_status=\"bogus\"}",
+   "want": 1,
+   "prometheus": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_dnssec_signature_expiry_seconds{zone=\"seen.test.\",provider=\"A\"}",
+   "want": 86400,
+   "prometheus": {
+    "got": [
+     86400.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     86400.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_probe_intercepted",
+   "want": 0,
+   "prometheus": {
+    "got": [
+     0.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     0.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_check_verdict{zone=\"blind.test.\",check=\"parity\",lostname_check_verdict=\"no_verdict\"}",
+   "want": 1,
+   "prometheus": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     1.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_check_duration_seconds{zone=\"blind.test.\",check=\"parity\"}",
+   "want": 7,
+   "prometheus": {
+    "got": [
+     7.0
+    ],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [
+     7.0
+    ],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_parity_mismatches{zone=\"blind.test.\"}",
+   "want": null,
+   "prometheus": {
+    "got": [],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_parity_servers_answering{zone=\"blind.test.\"}",
+   "want": null,
+   "prometheus": {
+    "got": [],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_dnssec_status{zone=\"blind.test.\"}",
+   "want": null,
+   "prometheus": {
+    "got": [],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [],
+    "ok": true
+   }
+  },
+  {
+   "q": "lostname_check_last_success_timestamp_seconds{zone=\"blind.test.\"}",
+   "want": null,
+   "prometheus": {
+    "got": [],
+    "ok": true
+   },
+   "victoriametrics": {
+    "got": [],
+    "ok": true
+   }
+  }
+ ],
+ "pass": true,
+ "run": {
+  "date": "2026-11-06",
+  "host": "throwaway Hetzner cx43 lab box, Ubuntu 24.04, Podman; destroyed after the run",
+  "lostname": "commit e432a04 (watch slice 1b) plus tools/conformance"
+ }
+}

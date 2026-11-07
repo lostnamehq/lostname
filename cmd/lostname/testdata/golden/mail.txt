@@ -1,0 +1,4 @@
+mail example.test.: MX mx.example.test.
+  SPF yes, DMARC p=none, MTA-STS yes, TLS-RPT no, DKIM selectors 1, TLSA 0, BIMI 0
+M-07  note    _dmarc.example.test. TXT: the DMARC policy is p=none: receivers report, but take no action on mail that fails (RFC 9989 4.7)
+mail pass: example.test., 0 blocker(s), 0 risk(s), 1 note(s)
