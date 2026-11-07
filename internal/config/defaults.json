@@ -7,12 +7,17 @@
       "none": { "latency_seconds": 0, "window_seconds": 0, "source": "no registry lock" },
       "domain-shield": { "latency_seconds": 14400, "window_seconds": 86400,
         "source": "planning assumption for .be Domain Shield: unlock latency is the registrar's; replace with its stated or measured time. The 24 h window is DNS Belgium's" },
-      "domain-guard": { "latency_seconds": 172800, "window_seconds": 0,
-        "source": ".be Domain Guard: DNS Belgium answers within 2 working days, one confirmation per change request" }
+      "domain-guard": { "latency_seconds": 345600, "window_seconds": 0,
+        "source": ".be Domain Guard: DNS Belgium answers within 2 working days, one confirmation per change request. Planned as the upper bound across a weekend (asked Friday evening, answered Tuesday evening: 4 calendar days); public holidays add to it" }
     }
   },
-  "probe": { "canary": "203.0.113.1:53", "timeout_seconds": 2 },
-  "parity": { "timeout_seconds": 3, "edns_buffer_bytes": 1232, "nx_probe_label": "lostname-nx-probe", "model": "T0" },
-  "fetch": { "timeout_seconds": 10 },
-  "lint": { "disabled_rules": [], "severity": {} }
+  "probe": { "canary": "203.0.113.1:53", "canary_v6": "[2001:db8::53]:53", "timeout_seconds": 2 },
+  "parity": { "timeout_seconds": 3, "edns_buffer_bytes": 1232, "nx_probe_label": "lostname-nx-probe", "model": "T0",
+    "deadline_seconds": 900, "max_queries_per_server": 5000, "pace_milliseconds": 0,
+    "min_signature_life_seconds": 21600 },
+  "fetch": { "timeout_seconds": 10, "deadline_seconds": 600, "max_records": 2000000 },
+  "lint": { "disabled_rules": [], "severity": {} },
+  "watch": { "listen": "127.0.0.1:9853", "interval_seconds": 3600, "zones": [], "catalogs": [], "otlp_endpoint": "", "resource": {},
+             "events": [], "events_endpoint": "", "instance": "", "traces": false,
+             "zone_id": { "salt_file": "" }, "state_file": "" }
 }

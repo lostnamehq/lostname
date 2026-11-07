@@ -20,7 +20,7 @@ def test_unbalanced_markers_refuse():
     try:
         publicize.render("<!-- private -->\nno end\n", "x.md")
     except SystemExit as e:
-        assert "unbalanced" in str(e)
+        assert "never closed" in str(e)
     else:
         raise AssertionError("unbalanced markers must refuse")
 

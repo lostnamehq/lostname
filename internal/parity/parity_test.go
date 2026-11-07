@@ -153,6 +153,26 @@ func TestInterceptedPathGivesNoVerdict(t *testing.T) {
 	if r.Verdict != "no_verdict" || !r.Intercepted || r.Questions != 0 {
 		t.Fatalf("want no_verdict before any question, got %+v", r)
 	}
+	// The report names what answered, for the probe.intercepted event: the canary, over both protocols here.
+	if r.Interception == nil || r.Interception.Probe != a.Addr || strings.Join(r.Interception.Protocols, ",") != "udp,tcp" {
+		t.Fatalf("want the interception named (%s over udp,tcp), got %+v", a.Addr, r.Interception)
+	}
+}
+
+// M9: an IPv6 provider address brings the IPv6 probe in; with IPv4 addresses only, an IPv6-only middlebox is not
+// consulted. The "IPv6 canary" here is a server that answers, as an intercepting middlebox would.
+func TestIPv6ProbeFollowsTheProviderAddresses(t *testing.T) {
+	a := authtest.Start(t, zoneOf(t, base), authtest.None)
+	o := opts(t, "T0", quiet(t))
+	o.Canary6 = a.Addr
+	r := mustRun(t, zoneOf(t, base), []Provider{{"A", []string{a.Addr}}, {"B", []string{a.Addr, "[2001:db8::99]:53"}}}, o)
+	if r.Verdict != "no_verdict" || !r.Intercepted {
+		t.Fatalf("an IPv6 provider address must bring in the IPv6 probe; got %s, intercepted %v", r.Verdict, r.Intercepted)
+	}
+	r = mustRun(t, zoneOf(t, base), []Provider{{"A", []string{a.Addr}}, {"B", []string{a.Addr}}}, o)
+	if r.Intercepted {
+		t.Fatal("with IPv4 addresses only, the IPv6 probe must not decide the run")
+	}
 }
 
 func TestReportIsDeterministic(t *testing.T) {
@@ -180,10 +200,22 @@ func TestSerialDriftIsReported(t *testing.T) {
 	}
 }
 
+// L15: a provider whose own servers agree on the data but not on the TTL is inconsistent, not consistent.
+func TestServersDifferingOnlyInTTLAreInconsistent(t *testing.T) {
+	a := authtest.Start(t, zoneOf(t, base), authtest.None)
+	b1 := authtest.Start(t, zoneOf(t, base), authtest.None)
+	b2 := authtest.Start(t, zoneOf(t, strings.Replace(base, "mail       IN A", "mail 300   IN A", 1)), authtest.None)
+	r := mustRun(t, zoneOf(t, base), []Provider{{"A", []string{a.Addr}}, {"B", []string{b1.Addr, b2.Addr}}},
+		opts(t, "T0", quiet(t)))
+	if r.Verdict != "fail" || !kinds(r)["inconsistent-servers"] {
+		t.Fatalf("want fail with inconsistent-servers, got %s %v", r.Verdict, kinds(r))
+	}
+}
+
 func opts(t *testing.T, model, canary string) Options {
 	t.Helper()
-	return Options{Model: model, Timeout: time.Second, EDNSBuffer: 1232, NXProbe: "lostname-nx-probe", Canary: canary,
-		ProbeTimeout: time.Second}
+	return Options{Model: model, Timeout: 500 * time.Millisecond, EDNSBuffer: 1232, NXProbe: "lostname-nx-probe", Canary: canary,
+		Canary6: canary, ProbeTimeout: 150 * time.Millisecond, Now: time.Now(), MinSigLife: 6 * time.Hour}
 }
 
 func mustRun(t *testing.T, z *zone.Zone, ps []Provider, o Options) Report {
@@ -231,4 +263,77 @@ func TestRRTypeNames(t *testing.T) {
 			t.Errorf("rrtype(%q) = %d, want %d", in, got, want)
 		}
 	}
+}
+
+// L-20 on the providers' real addresses: two providers on one network fail together. A risk, never the verdict.
+func TestSharedFateBetweenProviders(t *testing.T) {
+	ps := func(a, b string) []Provider { return []Provider{{"A", []string{a}}, {"B", []string{b}}} }
+	for _, tc := range []struct {
+		name, a, b string
+		want       int
+	}{
+		{"one address", "192.0.2.1:53", "192.0.2.1:53", 1},
+		{"one /24", "192.0.2.1:53", "192.0.2.200:53", 1},
+		{"one /48", "[2001:db8:1::1]:53", "[2001:db8:1:ff::1]:53", 1},
+		{"apart", "192.0.2.1:53", "198.51.100.1:53", 0},
+		{"apart, v6", "[2001:db8:1::1]:53", "[2001:db8:2::1]:53", 0},
+	} {
+		fs := sharedFate("example.test.", ps(tc.a, tc.b))
+		if len(fs) != tc.want || (tc.want == 1 && (fs[0].Severity != Risk || fs[0].Provider != "B")) {
+			t.Errorf("%s: %+v", tc.name, fs)
+		}
+	}
+	if fs := sharedFate("example.test.", []Provider{{"A", []string{"192.0.2.1:53", "192.0.2.2:53"}}}); len(fs) != 0 {
+		t.Errorf("one provider's own servers are L-20 offline (lint), not between providers: %+v", fs)
+	}
+}
+
+// L-19: a parent that scans CDS installs whatever one provider publishes. Different sets fail; one-sided is a risk.
+func TestCDSAcrossProviders(t *testing.T) {
+	cds := func(tag string) string {
+		return "@ IN CDS " + tag + " 13 2 " + strings.Repeat("AB", 32) + "\n"
+	}
+	kinds := func(a, b string) map[string]int {
+		sa := authtest.Start(t, zoneOf(t, base+a), authtest.None)
+		sb := authtest.Start(t, zoneOf(t, base+b), authtest.None)
+		r := mustRun(t, zoneOf(t, base), []Provider{{"A", []string{sa.Addr}}, {"B", []string{sb.Addr}}},
+			opts(t, "T0", "127.0.0.1:1"))
+		got := map[string]int{}
+		for _, f := range r.Findings {
+			if strings.HasPrefix(f.Kind, "cds-") {
+				got[f.Kind+"/"+string(f.Severity)]++
+			}
+		}
+		return got
+	}
+	for _, tc := range []struct {
+		name, a, b, want string
+	}{
+		{"same set", cds("11111"), cds("11111"), ""},
+		{"none", "", "", ""},
+		{"different sets", cds("11111"), cds("22222"), "cds-differs/fail"},
+		{"one side only", cds("11111"), "", "cds-one-sided/risk"},
+		{"other side only", "", cds("22222"), "cds-one-sided/risk"},
+	} {
+		got := kinds(tc.a, tc.b)
+		if (tc.want == "" && len(got) != 0) || (tc.want != "" && (len(got) != 1 || got[tc.want] != 1)) {
+			t.Errorf("%s: %v, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// L-19 inside one provider: its servers publish different CDS sets, so a scanning parent may install either.
+func TestCDSWithinAProvider(t *testing.T) {
+	cds := func(tag string) string { return "@ IN CDS " + tag + " 13 2 " + strings.Repeat("AB", 32) + "\n" }
+	a1 := authtest.Start(t, zoneOf(t, base+cds("11111")), authtest.None)
+	a2 := authtest.Start(t, zoneOf(t, base+cds("22222")), authtest.None)
+	b := authtest.Start(t, zoneOf(t, base+cds("11111")), authtest.None)
+	r := mustRun(t, zoneOf(t, base), []Provider{{"A", []string{a1.Addr, a2.Addr}}, {"B", []string{b.Addr}}},
+		opts(t, "T0", "127.0.0.1:1"))
+	for _, f := range r.Findings {
+		if f.Kind == "cds-differs" && f.Provider == "A" && f.Severity == Fail {
+			return
+		}
+	}
+	t.Fatalf("A's two servers disagree on CDS: want cds-differs at A, got %+v", r.Findings)
 }

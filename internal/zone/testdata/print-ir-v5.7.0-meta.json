@@ -1,0 +1,80 @@
+{
+  "registrars": [
+    {
+      "name": "none",
+      "type": "-"
+    }
+  ],
+  "dns_providers": [
+    {
+      "name": "bind",
+      "type": "-"
+    }
+  ],
+  "domains": [
+    {
+      "name": "example.test",
+      "uniquename": "example.test",
+      "registrar": "none",
+      "dnsProviders": {
+        "bind": -1
+      },
+      "records": [
+        {
+          "typenum": 1,
+          "type": "A",
+          "ttl": 3600,
+          "name": "@",
+          "name_unicode": "@",
+          "comparablev3": "192.0.2.10",
+          "filepos": "[line:5:5]",
+          "rdata": {
+            "Addr": "192.0.2.10"
+          }
+        },
+        {
+          "typenum": 1,
+          "type": "A",
+          "ttl": 3600,
+          "name": "www",
+          "name_unicode": "www",
+          "comparablev3": "192.0.2.40",
+          "meta": {
+            "cloudflare_proxy": "on"
+          },
+          "filepos": "[line:6:5]",
+          "rdata": {
+            "Addr": "192.0.2.40"
+          }
+        },
+        {
+          "typenum": 1,
+          "type": "A",
+          "ttl": 3600,
+          "name": "geo",
+          "name_unicode": "geo",
+          "comparablev3": "192.0.2.41",
+          "meta": {
+            "geo_region": "eu"
+          },
+          "filepos": "[line:7:5]",
+          "rdata": {
+            "Addr": "192.0.2.41"
+          }
+        },
+        {
+          "typenum": 1,
+          "type": "A",
+          "ttl": 3600,
+          "name": "plain",
+          "name_unicode": "plain",
+          "comparablev3": "192.0.2.42",
+          "filepos": "[line:8:5]",
+          "rdata": {
+            "Addr": "192.0.2.42"
+          }
+        }
+      ]
+    }
+  ]
+}

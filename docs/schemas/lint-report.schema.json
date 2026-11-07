@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lostname.be/schemas/lint-report.schema.json",
+  "title": "lostname lint report",
+  "description": "Output of `lostname lint --json`. No timestamps: equal input gives byte-equal output. Severities: blocker fails the run; risk fails it only with --strict; note never does. Parity's fail corresponds to lint's blocker.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "origin",
+    "source",
+    "records",
+    "verdict",
+    "counts",
+    "findings"
+  ],
+  "properties": {
+    "schema": {
+      "const": "lostname.lint/v0"
+    },
+    "origin": {
+      "type": "string",
+      "description": "fully qualified, lower case, ends with a dot"
+    },
+    "source": {
+      "type": "string",
+      "description": "where the records came from, for example zonefile:PATH"
+    },
+    "records": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blocker",
+        "risk",
+        "note"
+      ],
+      "properties": {
+        "blocker": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "risk": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "note": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule",
+          "severity",
+          "name",
+          "message",
+          "ref"
+        ],
+        "properties": {
+          "rule": {
+            "type": "string",
+            "pattern": "^L-[0-9]{2}$"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "risk",
+              "note"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "absent when the finding is about the name, not one type"
+          },
+          "message": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string",
+            "description": "the RFC or source the rule rests on"
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "matrix", "commit", "released"],
+      "description": "present with --to: the target provider and the provider matrix the verdict rests on, with its release date",
+      "properties": {
+        "provider": {"type": "string"},
+        "matrix": {"type": "string"},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "released": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "worse",
+        "fixed"
+      ],
+      "description": "present with --baseline: the findings are then only those that are new or whose severity rose, and the verdict judges only them",
+      "properties": {
+        "worse": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

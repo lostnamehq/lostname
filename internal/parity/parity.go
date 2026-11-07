@@ -4,12 +4,16 @@
 //   - the path is checked for interception before any query (P1b);
 //   - a definite difference fails; a missing authoritative answer gives no verdict; only full coverage passes.
 //
-// Signature validation (model section 4, "Signatures") is not in this version; DNSSEC records are not compared yet.
+// Signatures (model section 4): every RRSIG a server returns is checked against that server's own DNSKEY RRset:
+// inside its validity window, made by a key the server publishes, and cryptographically valid. Where the zone file is
+// signed, every answered RRset must carry a valid signature. Not yet: the chain to the parent's DS, and authenticated
+// denial (NSEC, NSEC3).
 package parity
 
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,14 +36,43 @@ type Options struct {
 	Timeout      time.Duration // per query
 	EDNSBuffer   uint16        // advertised UDP payload size
 	NXProbe      string        // label of the name that must not exist
-	Canary       string        // interception probe address
+	Canary       string        // interception probe address, IPv4
+	Canary6      string        // interception probe address, IPv6 (M9)
 	ProbeTimeout time.Duration
+	Now          time.Time     // the moment signatures are judged at; the command passes the current time
+	MinSigLife   time.Duration // a valid signature that expires sooner than this is a risk (parity.min_signature_life_seconds)
+	// Limits for a run against real providers (plan v0.1, "Parity at scale"); zero means none. A question that a
+	// limit stops is a gap, so the run ends without a verdict rather than with a partial pass.
+	Deadline   time.Duration  // the whole run (parity.deadline_seconds)
+	MaxQueries int            // per server address (parity.max_queries_per_server)
+	Pace       time.Duration  // the least time between two queries to one server address (parity.pace_milliseconds)
+	Parent     []string       // the parent zone's servers, for the DS RRset; optional, but a signed zone needs it
+	Observe    func(Exchange) // optional: called with every DNS exchange, for an evidence bundle
+}
+
+// Exchange is one DNS question and what came back, as an evidence bundle records it (model section 6).
+type Exchange struct {
+	Time       string   `json:"time"` // RFC 3339, UTC, when the answer (or the error) arrived
+	Server     string   `json:"server"`
+	Transport  string   `json:"transport"`
+	Name       string   `json:"name"`
+	Type       string   `json:"type"`
+	Rcode      string   `json:"rcode,omitempty"`
+	AA         bool     `json:"aa"`
+	TC         bool     `json:"tc"`
+	Answer     []string `json:"answer,omitempty"`
+	Authority  []string `json:"authority,omitempty"`
+	Additional []string `json:"additional,omitempty"`
+	Error      string   `json:"error,omitempty"`
+	// Started is when the query was sent, for a trace span; not part of the evidence JSON.
+	Started time.Time `json:"-"`
 }
 
 func (o Options) validate() error {
-	if o.Model == "" || o.Timeout <= 0 || o.EDNSBuffer == 0 || o.NXProbe == "" || o.Canary == "" || o.ProbeTimeout <= 0 {
-		return errors.New("parity: model, timeout, EDNS buffer, NX probe label, probe address and probe timeout are " +
-			"required (set them in the config)")
+	if o.Model == "" || o.Timeout <= 0 || o.EDNSBuffer == 0 || o.NXProbe == "" || o.Canary == "" || o.Canary6 == "" ||
+		o.ProbeTimeout <= 0 || o.Now.IsZero() || o.MinSigLife <= 0 {
+		return errors.New("parity: model, timeout, EDNS buffer, NX probe label, both probe addresses, probe timeout, " +
+			"the time to judge signatures at and the minimum signature life are required (set them in the config)")
 	}
 	return nil
 }
@@ -63,6 +96,68 @@ type Finding struct {
 	Detail   string   `json:"detail"`
 }
 
+// sharedFate is lint rule L-20 on the providers' real addresses: two providers whose servers share an address or a
+// prefix (/24 for IPv4, /48 for IPv6) fail together, whatever their names say. A risk: it never decides the verdict.
+// AS numbers are not checked yet (RL-3).
+func sharedFate(origin string, providers []Provider) []Finding {
+	var out []Finding
+	for i, a := range providers {
+		for _, b := range providers[i+1:] {
+			for _, x := range a.Addrs {
+				for _, y := range b.Addrs {
+					what := sharedPrefix(hostIP(x), hostIP(y))
+					if hx, hy := hostOf(x), hostOf(y); what == "" && hostIP(x) == nil && strings.EqualFold(hx, hy) {
+						what = "a host name" // red team 3, P3-8: the same server by name
+					}
+					if what != "" {
+						out = append(out, Finding{Risk, "shared-fate", origin, "NS", b.Name, fmt.Sprintf("%s of %s "+
+							"and %s of %s share %s: the two providers can fail together (lint L-20)", x, a.Name, y,
+							b.Name, what)})
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func hostOf(addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return strings.TrimSuffix(addr, ".")
+	}
+	return strings.TrimSuffix(host, ".")
+}
+
+func hostIP(addr string) net.IP {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	return net.ParseIP(host)
+}
+
+// sharedPrefix says what two addresses share: "an address", "a /24 prefix" or "a /48 prefix", or "".
+func sharedPrefix(x, y net.IP) string {
+	switch {
+	case x == nil || y == nil:
+		return ""
+	case x.Equal(y):
+		return "an address"
+	case x.To4() != nil && y.To4() != nil && x.Mask(net.CIDRMask(24, 32)).Equal(y.Mask(net.CIDRMask(24, 32))):
+		return "a /24 prefix"
+	case x.To4() == nil && y.To4() == nil && x.Mask(net.CIDRMask(48, 128)).Equal(y.Mask(net.CIDRMask(48, 128))):
+		return "a /48 prefix"
+	}
+	return ""
+}
+
+// Interception is the probe address that answered and the protocols (udp, tcp) it answered over.
+type Interception struct {
+	Probe     string   `json:"probe"`
+	Protocols []string `json:"protocols"`
+}
+
 // Gap is a question that got no usable authoritative answer: the reason there is no verdict.
 type Gap struct {
 	Provider  string `json:"provider"`
@@ -82,9 +177,16 @@ type Report struct {
 	Providers   []Provider `json:"providers"`
 	Questions   int        `json:"questions"`
 	Intercepted bool       `json:"intercepted"`
-	Verdict     string     `json:"verdict"` // pass, fail or no_verdict
-	Findings    []Finding  `json:"findings"`
-	Gaps        []Gap      `json:"gaps"`
+	// Interception names the probe address that answered and the protocols it answered over, when Intercepted.
+	Interception *Interception `json:"interception,omitempty"`
+	Verdict      string        `json:"verdict"` // pass, fail or no_verdict
+	Findings     []Finding     `json:"findings"`
+	Gaps         []Gap         `json:"gaps"`
+	// SignatureExpiry is, per provider, the earliest expiration (Unix seconds) of a valid RRSIG it served: the moment
+	// its zone goes bogus if re-signing stops. Absent for a provider that served no valid signature.
+	SignatureExpiry map[string]int64 `json:"signature_expiry,omitempty"`
+	// Queries is, per server address, how many queries the run sent to it (the parent's servers included).
+	Queries map[string]int `json:"queries"`
 }
 
 type question struct {
@@ -97,6 +199,59 @@ type answer struct {
 	class string   // "data", "nodata", "nxdomain", "referral"
 	rdata []string // sorted canonical RDATA (or NS targets for a referral)
 	ttls  []uint32
+	rrs   []dns.RR     // the answered RRset as received, for signature checks; not part of the comparison
+	sigs  []*dns.RRSIG // the RRSIGs over that RRset
+	// denial holds the NSEC and NSEC3 records of a negative answer, and denialSigs their RRSIGs.
+	denial     []dns.RR
+	denialSigs []*dns.RRSIG
+}
+
+// run is the state of one Run that the checks share.
+type runState struct {
+	o          Options
+	origin     string
+	signed     bool                     // the zone file has an apex DNSKEY RRset: signatures are expected
+	keys       map[string][]*dns.DNSKEY // per server address, its DNSKEY RRset
+	keySet     map[string][]dns.RR      // per server address, the DNSKEY RRset as received, and its RRSIGs
+	keySigs    map[string][]*dns.RRSIG
+	denialType map[string]string // per provider, the denial it uses: NSEC or NSEC3
+	keyAnswer  map[string]string // per server address, the DNSKEY answer's comparison key (TCP)
+	ds         []*dns.DS         // the parent's DS RRset, asked once
+	dsReason   string
+	dsDone     bool
+	noKeys     map[string]string // per server address, why it has none
+	seen       map[string]bool   // signature findings already reported (one per provider, question and kind)
+	secureCuts map[string]bool   // delegations with a DS in the zone file: their referrals need no denial
+	started    time.Time
+	queries    map[string]int       // per server address, queries sent
+	last       map[string]time.Time // per server address, when the last query went out
+	answered   map[string]bool      // per server address, whether it answered anything in this run
+}
+
+// query sends one question through the run's limits: the deadline, the per-server budget and pacing. A server that
+// answered earlier in the run and then stops answering, or refuses, is labelled as possibly rate limiting: providers
+// throttle bursts, and the gap should say so rather than look like a broken server.
+func (ctx *runState) query(addr, transport string, q question) (answer, string) {
+	o := ctx.o
+	if o.Deadline > 0 && time.Since(ctx.started) >= o.Deadline {
+		return answer{}, "not asked: the run reached its deadline (parity.deadline_seconds)"
+	}
+	if o.MaxQueries > 0 && ctx.queries[addr] >= o.MaxQueries {
+		return answer{}, "not asked: the query budget for this server is spent (parity.max_queries_per_server)"
+	}
+	if wait := o.Pace - time.Since(ctx.last[addr]); o.Pace > 0 && wait > 0 {
+		time.Sleep(wait)
+	}
+	ctx.last[addr] = time.Now()
+	ctx.queries[addr]++
+	a, reason := query(addr, transport, q, o.Timeout, o.EDNSBuffer, o.Observe)
+	switch {
+	case reason == "" || reason == truncatedUDP:
+		ctx.answered[addr] = true
+	case ctx.answered[addr] && (strings.HasPrefix(reason, "no answer") || reason == "rcode REFUSED"):
+		reason += " (possibly rate limited: this server answered earlier in the run)"
+	}
+	return a, reason
 }
 
 func (a answer) key() string { return a.class + "|" + strings.Join(a.rdata, "\n") }
@@ -122,21 +277,42 @@ func Run(z *zone.Zone, providers []Provider, o Options) (Report, error) {
 	if len(providers) > 0 {
 		rep.Reference = providers[0].Name
 	}
-	if probe.Intercepted(o.Canary, o.ProbeTimeout) {
+	var targets []string
+	for _, p := range providers {
+		targets = append(targets, p.Addrs...)
+	}
+	rep.Findings = append(rep.Findings, sharedFate(z.Origin, providers)...)
+	if c, protos := probe.FirstIntercepted(probe.Canaries(targets, o.Canary, o.Canary6), o.ProbeTimeout); c != "" {
 		rep.Intercepted, rep.Verdict = true, "no_verdict"
-		rep.Gaps = append(rep.Gaps, Gap{Reason: "the network path answers DNS for any address (probe " + o.Canary +
+		rep.Interception = &Interception{Probe: c, Protocols: protos}
+		rep.Gaps = append(rep.Gaps, Gap{Reason: "the network path answers DNS for any address (probe " + c +
 			"); no measurement over it can be trusted"})
 		return rep, nil
 	}
 	qs := questions(z, o.NXProbe)
 	rep.Questions = len(qs)
+	ctx := &runState{o: o, origin: z.Origin, signed: len(z.At(z.Origin, "DNSKEY")) > 0, keys: map[string][]*dns.DNSKEY{},
+		noKeys: map[string]string{}, seen: map[string]bool{}, keySet: map[string][]dns.RR{},
+		keySigs: map[string][]*dns.RRSIG{}, denialType: map[string]string{}, keyAnswer: map[string]string{},
+		secureCuts: map[string]bool{}, started: time.Now(), queries: map[string]int{}, last: map[string]time.Time{},
+		answered: map[string]bool{}}
+	for _, cut := range z.Delegations() {
+		ctx.secureCuts[cut] = len(z.At(cut, "DS")) > 0
+	}
 	views := map[string]map[question]*answer{}
 	for _, p := range providers {
 		views[p.Name] = map[question]*answer{}
 		for _, q := range qs {
-			views[p.Name][q] = ask(p, q, o, &rep)
+			views[p.Name][q] = ask(ctx, p, q, &rep)
+		}
+		for _, addr := range p.Addrs {
+			if _, served := ctx.keys[addr]; ctx.signed || served || len(o.Parent) > 0 {
+				checkChain(ctx, p.Name, addr, &rep)
+			}
 		}
 	}
+	compareDenialTypes(ctx, providers, &rep)
+	compareCDS(ctx, providers, &rep)
 	for _, q := range qs {
 		ref := views[rep.Reference][q]
 		for _, p := range providers {
@@ -150,6 +326,7 @@ func Run(z *zone.Zone, providers []Provider, o Options) (Report, error) {
 			}
 		}
 	}
+	rep.Queries = ctx.queries
 	sortReport(&rep)
 	switch {
 	case hasFail(rep.Findings):
@@ -192,7 +369,11 @@ func questions(z *zone.Zone, nxLabel string) []question {
 			continue
 		}
 		if c := below(r.Name); c != "" {
-			add(question{c, "NS", "referral"}) // glue and records below a cut are the child's business
+			if r.Name == c && r.Type == "DS" {
+				add(question{c, "DS", "record"}) // red team D1: the DS at a cut is this zone's own, signed data
+				continue
+			}
+			add(question{c, "NS", "referral"}) // the NS and its glue; records below a cut are the child's business
 			continue
 		}
 		add(question{r.Name, r.Type, "record"})
@@ -229,11 +410,11 @@ func ancestors(name, origin string) []string {
 
 // ask queries every address of p over UDP and TCP and returns the provider's single view, or nil when no address
 // gave a usable answer. Different answers between a provider's own servers are a finding.
-func ask(p Provider, q question, o Options, rep *Report) *answer {
+func ask(ctx *runState, p Provider, q question, rep *Report) *answer {
 	var got []answer
 	for _, addr := range p.Addrs {
 		for _, tr := range []string{"udp", "tcp"} {
-			a, reason := query(addr, tr, q, o.Timeout, o.EDNSBuffer)
+			a, reason := ctx.query(addr, tr, q)
 			if reason == truncatedUDP {
 				continue // normal: the TCP answer for this address decides
 			}
@@ -241,6 +422,8 @@ func ask(p Provider, q question, o Options, rep *Report) *answer {
 				rep.Gaps = append(rep.Gaps, Gap{p.Name, addr, tr, q.name, q.typ, reason})
 				continue
 			}
+			checkSignatures(ctx, p.Name, addr, tr, q, a, rep)
+			checkDenial(ctx, p.Name, addr, tr, q, a, rep)
 			got = append(got, a)
 		}
 	}
@@ -273,19 +456,31 @@ func ask(p Provider, q question, o Options, rep *Report) *answer {
 				"the provider's own servers or transports give different answers"})
 			break
 		}
+		if !sameTTLs(a.ttls, got[0].ttls) { // L15: authoritative servers serve the zone's TTL, never a countdown
+			rep.Findings = append(rep.Findings, Finding{Fail, "inconsistent-servers", q.name, q.typ, p.Name,
+				fmt.Sprintf("the provider's own servers or transports give the same data with different TTLs (%v, %v)",
+					got[0].ttls, a.ttls)})
+			break
+		}
 	}
 	return &got[0]
 }
 
 const truncatedUDP = "truncated over UDP"
 
-func query(addr, transport string, q question, timeout time.Duration, edns uint16) (answer, string) {
+func query(addr, transport string, q question, timeout time.Duration, edns uint16, observe func(Exchange)) (answer, string) {
 	m := new(dns.Msg)
 	m.SetQuestion(q.name, rrtype(q.typ))
 	m.RecursionDesired = false
 	m.SetEdns0(edns, true)
 	c := &dns.Client{Net: transport, Timeout: timeout}
+	started := time.Now()
 	r, _, err := c.Exchange(m, addr)
+	if observe != nil {
+		e := record(addr, transport, q, r, err)
+		e.Started = started
+		observe(e)
+	}
 	if err != nil {
 		return answer{}, "no answer: " + shortErr(err)
 	}
@@ -301,23 +496,43 @@ func query(addr, transport string, q question, timeout time.Duration, edns uint1
 		return answer{}, "rcode " + dns.RcodeToString[r.Rcode]
 	}
 	if q.kind == "referral" {
-		var ns []string
+		// Red team D3: a provider that answers for the delegated child with authority, or with data in the answer
+		// section, serves its own copy of the child instead of delegating.
+		if r.Authoritative || len(r.Answer) > 0 {
+			return answer{class: "child-served"}, ""
+		}
+		var rdata []string
+		targets := map[string]bool{}
 		for _, rr := range r.Ns {
 			if v, ok := rr.(*dns.NS); ok && strings.EqualFold(v.Hdr.Name, q.name) {
-				ns = append(ns, strings.ToLower(v.Ns))
+				t := strings.ToLower(v.Ns)
+				targets[t] = true
+				rdata = append(rdata, "NS "+t)
 			}
 		}
-		if len(ns) == 0 {
+		if len(rdata) == 0 {
 			return answer{}, "no referral where a zone cut is expected"
 		}
-		sort.Strings(ns)
-		return answer{class: "referral", rdata: ns}, ""
+		// Red team D2: glue for targets inside the delegated zone is part of the referral, and is compared too.
+		for _, rr := range r.Extra {
+			h := rr.Header()
+			name := strings.ToLower(h.Name)
+			if (h.Rrtype == dns.TypeA || h.Rrtype == dns.TypeAAAA) && targets[name] && dns.IsSubDomain(q.name, name) {
+				rdata = append(rdata, dns.Type(h.Rrtype).String()+" "+name+" "+canonical(rr))
+			}
+		}
+		sort.Strings(rdata)
+		a := answer{class: "referral", rdata: rdata}
+		a.denial, a.denialSigs = denialOf(r) // the no-DS proof of an insecure delegation; not part of the comparison
+		return a, ""
 	}
 	if !r.Authoritative {
 		return answer{}, "not authoritative (AA not set)"
 	}
 	if r.Rcode == dns.RcodeNameError {
-		return answer{class: "nxdomain"}, ""
+		a := answer{class: "nxdomain"}
+		a.denial, a.denialSigs = denialOf(r)
+		return a, ""
 	}
 	var a answer
 	for _, rr := range r.Answer {
@@ -328,14 +543,29 @@ func query(addr, transport string, q question, timeout time.Duration, edns uint1
 		if h.Rrtype != rrtype(q.typ) && h.Rrtype != dns.TypeCNAME {
 			continue // RRSIGs and other types that come with the answer are compared separately (DNSSEC parity)
 		}
-		a.rdata = append(a.rdata, dns.Type(h.Rrtype).String()+" "+canonical(rr))
+		class := ""
+		if h.Class != dns.ClassINET {
+			class = "class=" + dns.Class(h.Class).String() + " " // red team D6: another class never compares equal
+		}
+		a.rdata = append(a.rdata, dns.Type(h.Rrtype).String()+" "+class+canonical(rr))
 		a.ttls = append(a.ttls, h.Ttl)
+		a.rrs = append(a.rrs, rr)
+	}
+	if len(a.rrs) > 0 {
+		covered := a.rrs[0].Header().Rrtype
+		for _, rr := range r.Answer {
+			if s, ok := rr.(*dns.RRSIG); ok && strings.EqualFold(s.Hdr.Name, q.name) && s.TypeCovered == covered {
+				a.sigs = append(a.sigs, s)
+			}
+		}
 	}
 	if len(a.rdata) == 0 {
 		a.class = "nodata"
+		a.denial, a.denialSigs = denialOf(r)
 		return a, ""
 	}
 	a.class = "data"
+	a.denial, a.denialSigs = denialOf(r) // a wildcard answer carries the proof that the name itself does not exist
 	sort.Strings(a.rdata)
 	sort.Slice(a.ttls, func(i, j int) bool { return a.ttls[i] < a.ttls[j] })
 	return a, ""
@@ -396,6 +626,21 @@ func checkAgainstZone(z *zone.Zone, q question, provider, model string, a answer
 			rep.Findings = append(rep.Findings, Finding{Fail, "ent-nxdomain", q.name, q.typ, provider,
 				"an empty non-terminal answered NXDOMAIN instead of NODATA (RFC 8020)"})
 		}
+		if a.class == "data" { // red team D5: the zone file has no data here
+			rep.Findings = append(rep.Findings, Finding{Fail, "ent-has-data", q.name, q.typ, provider,
+				fmt.Sprintf("the zone file has no data at this empty non-terminal; this provider answers %v", a.rdata)})
+		}
+	case "referral":
+		want := expectedReferral(z, q.name)
+		switch {
+		case a.class == "child-served":
+			rep.Findings = append(rep.Findings, Finding{Fail, "child-served", q.name, q.typ, provider,
+				"the provider answers for the delegated child with authority or data instead of a referral: it serves " +
+					"its own copy of the child zone"})
+		case strings.Join(want, "\n") != strings.Join(a.rdata, "\n"):
+			rep.Findings = append(rep.Findings, Finding{Fail, "referral-differs-zone", q.name, q.typ, provider,
+				fmt.Sprintf("the zone file delegates with %v; this provider refers with %v", want, a.rdata)})
+		}
 	case "nx-probe":
 		if a.class != "nxdomain" && hasWildcard(z) {
 			rep.Findings = append(rep.Findings, Finding{Note, "nx-probe-wildcard", q.name, q.typ, provider,
@@ -405,6 +650,23 @@ func checkAgainstZone(z *zone.Zone, q question, provider, model string, a answer
 				"a name that does not exist answered " + a.class + ": wildcard or synthesis to check"})
 		}
 	}
+}
+
+// expectedReferral is the zone file's referral at a cut: its NS targets and the glue for targets inside the
+// delegated zone, in the form query() gives a referral.
+func expectedReferral(z *zone.Zone, cut string) []string {
+	var out []string
+	for _, r := range z.At(cut, "NS") {
+		t := strings.ToLower(r.RR().(*dns.NS).Ns)
+		out = append(out, "NS "+t)
+		if dns.IsSubDomain(cut, t) {
+			for _, g := range append(z.At(t, "A"), z.At(t, "AAAA")...) {
+				out = append(out, g.Type+" "+t+" "+canonical(g.RR()))
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // expected is the zone file's own view of a record question, canonicalised like a provider answer.
@@ -469,10 +731,17 @@ func compareSOA(q question, refName string, ref answer, name string, a answer, r
 	}
 }
 
+// concat is each TXT record's strings joined as a consumer joins them (RFC 7208 section 3.3: no separator), sorted.
+// Red team D4: the spaces inside the strings are data and stay.
 func concat(rdata []string) string {
 	var parts []string
 	for _, r := range rdata {
-		parts = append(parts, strings.ReplaceAll(strings.ReplaceAll(r, "\" \"", ""), " ", ""))
+		rr, err := dns.NewRR(". 0 IN " + r)
+		if t, ok := rr.(*dns.TXT); err == nil && ok {
+			parts = append(parts, strings.Join(t.Txt, ""))
+		} else {
+			parts = append(parts, r) // not a TXT record as given: compared as is
+		}
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, "|")
@@ -529,4 +798,27 @@ func rrtype(s string) uint16 {
 		return uint16(n)
 	}
 	return 0
+}
+
+// record turns one exchange into its evidence form. The OPT pseudo-record is left out of the additional section.
+func record(addr, transport string, q question, r *dns.Msg, err error) Exchange {
+	e := Exchange{Time: time.Now().UTC().Format(time.RFC3339Nano), Server: addr, Transport: transport, Name: q.name,
+		Type: q.typ}
+	if err != nil {
+		e.Error = err.Error()
+		return e
+	}
+	e.Rcode, e.AA, e.TC = dns.RcodeToString[r.Rcode], r.Authoritative, r.Truncated
+	for _, rr := range r.Answer {
+		e.Answer = append(e.Answer, rr.String())
+	}
+	for _, rr := range r.Ns {
+		e.Authority = append(e.Authority, rr.String())
+	}
+	for _, rr := range r.Extra {
+		if rr.Header().Rrtype != dns.TypeOPT {
+			e.Additional = append(e.Additional, rr.String())
+		}
+	}
+	return e
 }

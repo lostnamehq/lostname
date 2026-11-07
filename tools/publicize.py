@@ -16,17 +16,45 @@ PAIRS = {
     "private/src/model.md": "docs/model.md",
     "private/src/prior-art.md": "docs/prior-art.md",
 }
-PRIVATE = re.compile(r"^[ \t]*<!-- private -->[ \t]*\n.*?^[ \t]*<!-- /private -->[ \t]*\n", re.S | re.M)
+OPEN = re.compile(r"^[ \t]*<!-- private -->[ \t]*$")
+CLOSE = re.compile(r"^[ \t]*<!-- /private -->[ \t]*$")
 LABELS = [
     (re.compile(r" ?\((?:I|C|T|C, T|T, C)\)"), ""),
     (re.compile(r"\[U\]"), "(unverified)"),
 ]
 
 
+def strip_private(src: str, rel: str) -> str:
+    """Drop every private passage, line by line. A marker that is not alone on its line, a nested, reversed or
+    unclosed marker, and any marker text left in the result all refuse the build (red team 2, C2): a passage is
+    either removed whole or the build stops."""
+    out, inside = [], 0
+    for n, line in enumerate(src.splitlines(keepends=True), 1):
+        bare = line.rstrip("\r\n")
+        if OPEN.match(bare):
+            if inside:
+                raise SystemExit(f"{rel}:{n}: a private marker opens inside another (opened at line {inside})")
+            inside = n
+            continue
+        if CLOSE.match(bare):
+            if not inside:
+                raise SystemExit(f"{rel}:{n}: a private marker closes with none open")
+            inside = 0
+            continue
+        if "<!-- private" in line or "<!-- /private" in line:
+            raise SystemExit(f"{rel}:{n}: a private marker must stand alone on its line")
+        if not inside:
+            out.append(line)
+    if inside:
+        raise SystemExit(f"{rel}:{inside}: a private marker is never closed")
+    result = "".join(out)
+    if "<!-- private" in result or "<!-- /private" in result:
+        raise SystemExit(f"{rel}: private marker text survived the build")
+    return result
+
+
 def render(src: str, rel: str) -> str:
-    if src.count("<!-- private -->") != src.count("<!-- /private -->"):
-        raise SystemExit(f"{rel}: unbalanced private markers")
-    out = PRIVATE.sub("", src)
+    out = strip_private(src, rel)
     for pat, rep in LABELS:
         out = pat.sub(rep, out)
     out = re.sub(r"\n{3,}", "\n\n", out)

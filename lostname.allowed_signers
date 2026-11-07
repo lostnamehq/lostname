@@ -1,0 +1,4 @@
+# The key that signs Lostname's release tags (decision of 2026-11-06); its private half is held by the maintainers.
+# Fingerprint SHA256:iyOHjpijFqgdMEDPjQBCaf0vPGsd7Vf0sCeX7eapWIk, created 2026-11-06. Verify a tag:
+#   git -c gpg.ssh.allowedSignersFile=lostname.allowed_signers tag -v vX.Y.Z
+lostname-releases namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPgUgLO8vLaD96H2f1k3ETiuyiyiuwg9V32LtBHAisoP

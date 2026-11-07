@@ -1,0 +1,72 @@
+# Lostname alert rules (docs/observability.md, "Alerts as code"). Prometheus rule format; vmalert reads it as is.
+# Every rule names an owner role, an action, a severity and a suggested autonomy. Lostname only suggests autonomy:
+# the deployer sets it. The `for` durations assume watch.interval_seconds 3600 (the default); scale them with it.
+groups:
+  - name: lostname
+    rules:
+      - alert: LostnameStandbyNotInParity
+        expr: lostname_parity_mismatches > 0
+        for: 1h  # two runs: true at run N, still true at run N+1 one interval later
+        labels: {severity: warning, autonomy: notify, owner_role: zone-owner}
+        annotations:
+          summary: "{{ $labels.provider_b }} serves {{ $value }} RRset(s) differently from {{ $labels.provider_a }} for {{ $labels.zone }}"
+          action: fix the standby provider before relying on it for an exit
+      - alert: LostnameSignatureExpirySoon
+        expr: lostname_dnssec_signature_expiry_seconds < 3 * 86400
+        labels: {severity: warning, autonomy: gated, owner_role: zone-owner}
+        annotations:
+          summary: "a signature for {{ $labels.zone }} at {{ $labels.provider }} expires within 3 days"
+          action: check the signer at that provider; expiry makes the zone bogus
+      - alert: LostnameDNSSECBogus
+        expr: lostname_dnssec_status{lostname_dnssec_status="bogus"} == 1
+        labels: {severity: critical, autonomy: human, owner_role: zone-owner}
+        annotations:
+          summary: "{{ $labels.zone }} is bogus at {{ $labels.provider }}"
+          action: "incident: validating resolvers reject the zone"
+      - alert: LostnameChecksSilent
+        expr: time() - lostname_check_last_success_timestamp_seconds > 3 * 3600  # three intervals
+        labels: {severity: warning, autonomy: notify, owner_role: watch-operator}
+        annotations:
+          summary: "no {{ $labels.check }} verdict for {{ $labels.zone }} in three intervals"
+          action: check that watch is running and can reach the servers
+      # The same alert for a check with no success since watch started (a restart, a new zone, or a check that was
+      # never able to measure): there is no timestamp to age, so the verdict stands in (red team 2, W4).
+      - alert: LostnameChecksSilent
+        expr: lostname_check_verdict{lostname_check_verdict="no_verdict"} == 1 unless on (zone, check) lostname_check_last_success_timestamp_seconds
+        for: 3h  # three intervals
+        labels: {severity: warning, autonomy: notify, owner_role: watch-operator}
+        annotations:
+          summary: "{{ $labels.check }} for {{ $labels.zone }} has had no verdict since watch started"
+          action: check that watch is running and can reach the servers
+      # Red team 3, W3-1: when watch itself stops, every series it emitted goes stale, so the rules above see
+      # nothing to age. This one fires on the absence itself. In a stack with several watch instances, add the
+      # instance's own labels to the selector, or it fires only when all of them are gone.
+      - alert: LostnameWatchAbsent
+        expr: absent_over_time(lostname_check_verdict[3h])  # three intervals
+        labels: {severity: warning, autonomy: notify, owner_role: watch-operator}
+        annotations:
+          summary: no Lostname verdicts at all for three intervals
+          action: check that watch is running and that its metrics reach this stack
+      - alert: LostnamePathIntercepted
+        expr: lostname_probe_intercepted == 1
+        labels: {severity: warning, autonomy: notify, owner_role: watch-operator}
+        annotations:
+          summary: something on the network path answers DNS for any address
+          action: run watch from a network path without DNS interception
+      # Exit readiness as an SLO (OB-2). SLI: lostname_exit_ready, 1 when the exit fits the zone's objective and the
+      # standby is in parity. Objective: ready 99% of the time over 30 days, an error budget of 1% (change 0.01 below
+      # to set another). Multi-window burn rates: each alert needs a long and a short window over the threshold, so it
+      # fires fast on a real burn and stops soon after recovery. A round without a verdict has no SLI sample: it burns
+      # no budget, and LostnameChecksSilent covers it.
+      - alert: LostnameExitBudgetBurnFast
+        expr: (1 - avg_over_time(lostname_exit_ready[1h])) > 14.4 * 0.01 and (1 - avg_over_time(lostname_exit_ready[5m])) > 14.4 * 0.01
+        labels: {severity: warning, autonomy: notify, owner_role: zone-owner}
+        annotations:
+          summary: "{{ $labels.zone }}: the modelled exit does not fit its objective; 2% of the 30-day error budget gone in an hour"
+          action: "restore readiness: bring the standby into parity, or shorten the exit (lower the DNSKEY TTL, review the registry lock)"
+      - alert: LostnameExitBudgetBurnSlow
+        expr: (1 - avg_over_time(lostname_exit_ready[3d])) > 1 * 0.01 and (1 - avg_over_time(lostname_exit_ready[6h])) > 1 * 0.01
+        labels: {severity: info, autonomy: notify, owner_role: zone-owner}
+        annotations:
+          summary: "{{ $labels.zone }} is using its (modelled) exit-readiness error budget at or above the sustainable rate"
+          action: plan the fix within the budget period; see lostname_exit_time_seconds against lostname_exit_target_seconds

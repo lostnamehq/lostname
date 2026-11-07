@@ -4,7 +4,8 @@ A pull request records its change here instead of editing `CHANGELOG.md`, so ope
 the same list. Add one file per change, named `<issue>.<section>.md`:
 
 - `<issue>` is the issue number (or a short lowercase slug when there is none);
-- `<section>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security` (Keep a Changelog).
+- `<section>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security` (Keep a Changelog), or
+  `upgrading` for what a user must do or know before taking the release; it comes first in the notes.
 
 The file holds Markdown bullets in the style of `CHANGELOG.md`: each entry starts with `- `, continuation lines are
 indented two spaces, lines stay within 120 columns, punctuation is plain ASCII. Example, `19.fixed.md`:

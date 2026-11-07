@@ -12,11 +12,22 @@ Lostname is a command-line tool for domain owners and the IT partners who run do
 
 > **Status: pre-release, published early.**
 > - **Done:** the model is written (`docs/model.md`), the falsifier lab has run (`m0/`), and the formal model of DNSSEC transitions can be explored with `go test ./internal/sim` (`internal/sim/`).
-> - **Works today** (`go run ./cmd/lostname`, early slices):
->   - `lint` checks a zone file against seven rules, offline;
+> - **Works today** (`go run ./cmd/lostname`, pre-release):
+>   - `lint` checks a zone file, or the output of `dnscontrol print-ir`, offline; with `--to PROVIDER` it also says what
+>     will not survive a move to that provider (DNSControl's provider matrix, pinned; every verdict names its version);
 >   - `fetch` transfers a zone (AXFR, TSIG);
->   - `parity` compares what two providers serve, fail-closed, without DNSSEC validation yet.
-> - **Next:** the rest of v0.1 (`ROADMAP.md`). The other commands below are the plan, not working code.
+>   - `parity` compares what two providers serve, fail-closed, and validates DNSSEC: signatures against each
+>     provider's own keys, the chain from the parent's DS, NSEC and NSEC3 denial, and the no-DS proof in referrals
+>     (NSEC3 opt-out included);
+>   - `watch` runs `lint` and `parity` on a schedule and exports metrics (`/metrics`, OTLP), optional events and
+>     traces, and a modelled exit-readiness SLO;
+>   - `--evidence DIR` on `lint` and `parity` writes the inputs, the report and every DNS exchange with a checksum
+>     manifest.
+>   - `mail` reads the zone's mail records (SPF, DMARC, DKIM, MTA-STS, TLS-RPT, BIMI, TLSA) offline;
+>   - `config` prints the effective configuration, and `doctor` checks that this machine, network path and
+>     configuration can give verdicts (interception probes, watch files);
+>   - CI templates in `deploy/ci/` run `parity` against a standby provider on a schedule (GitLab CI, GitHub Actions).
+> - **Next:** the rest of v0.1 (`ROADMAP.md`). Of the commands below, `plan`, `simulate`, `drill` and `report` are the plan, not working code.
 > - **Install path once released:** `lostname.be/lostname`.
 
 ## Why
@@ -32,7 +43,8 @@ Most owners find out during the move. Lostname finds out before it.
 | Command | Answers | Release |
 |---|---|---|
 | `lostname lint --to <provider>` | what will not survive a move to that provider | v0.1 |
-| `lostname parity --providers A,B` | do both providers answer every query the same, authoritatively | v0.1 |
+| `lostname parity --provider A=ADDR --provider B=ADDR` | do both providers answer every query the same, authoritatively | v0.1 |
+| `lostname mail` | what the zone publishes for mail (SPF, DMARC, DKIM, MTA-STS, TLS-RPT, BIMI, TLSA), and what is wrong with it, offline | v0.1 |
 | `lostname plan --from A --to B` | the safe order of steps, DNSSEC included, with the waits computed from your real TTLs, and the **exit time** | v0.2 |
 | `lostname simulate` | what any resolver would see at every step of that plan, including what goes wrong if a step fails | v0.2 |
 | `lostname drill`, `lostname report` | the yearly exit exercise, and the evidence to show for it | v0.3 |
@@ -42,7 +54,7 @@ Most owners find out during the move. Lostname finds out before it.
 - **Build on, never replace.** [DNSControl](https://github.com/DNSControl/dnscontrol) does export, import and push. Lostname calls the official, pinned binary and adds what it lacks.
 - **The owner acts.** Read-only by default. Lostname never opens your credentials file and never operates DNS for anyone.
 - **Facts with provenance.** Every finding says what was seen, where, when, and by which version of which tool.
-- **Evidence as a by-product.** Every run leaves a bundle with a checksum manifest.
+- **Evidence as a by-product.** Every check can leave a bundle (`--evidence`) with a checksum manifest.
 
 ## Standing on shoulders
 Lostname builds on:

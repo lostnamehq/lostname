@@ -1,0 +1,49 @@
+{
+  "schema": "lostname.mail/v0",
+  "origin": "example.test.",
+  "source": "zonefile:INPUT",
+  "verdict": "pass",
+  "counts": {
+    "blocker": 0,
+    "note": 1,
+    "risk": 0
+  },
+  "posture": {
+    "domain": "example.test.",
+    "mx": [
+      "mx.example.test."
+    ],
+    "spf": {
+      "all": "~",
+      "includes": [
+        "_spf.mail.example"
+      ]
+    },
+    "dmarc": {
+      "policy": "none",
+      "reports": true
+    },
+    "dkim": [
+      {
+        "selector": "s1",
+        "key_type": "rsa",
+        "revoked": true
+      }
+    ],
+    "mta_sts": {
+      "id": "20261106"
+    },
+    "bimi": [],
+    "tlsa": []
+  },
+  "findings": [
+    {
+      "rule": "M-07",
+      "severity": "note",
+      "name": "_dmarc.example.test.",
+      "type": "TXT",
+      "message": "the DMARC policy is p=none: receivers report, but take no action on mail that fails",
+      "ref": "RFC 9989 4.7"
+    }
+  ]
+}

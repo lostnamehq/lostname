@@ -10,5 +10,5 @@ var DefaultTTLs = TTLs{DS: 86400, Neg: 600, NSParent: 86400, DNSKEY: 3600, Margi
 var (
 	NoLock       = Lock{Name: "none"}
 	DomainShield = Lock{Name: "Domain Shield", Latency: 4 * 3600, Window: 24 * 3600}
-	DomainGuard  = Lock{Name: "Domain Guard", Latency: 2 * 86400}
+	DomainGuard  = Lock{Name: "Domain Guard", Latency: 4 * 86400} // 2 working days across a weekend (M11)
 )

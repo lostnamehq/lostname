@@ -1,0 +1,4 @@
+L-07  note    example.test. CAA: CAA issue "letsencrypt.org" has no accounturi: any account at that CA may issue (RFC 8657)
+L-11  blocker shop.example.test. NS: the delegation names ns1.dns-host.example., a server of the current DNS provider: after the exit it is lame unless shop.example.test. moves too (Lostname model section 3)
+L-12  risk    www.example.test. CNAME: CNAME points at proxy.dns-host.example., under dns-host.example, the current DNS provider's own domain: check that it keeps working after the exit (Lostname model section 3)
+lint fail: example.test., 12 record(s), 1 blocker(s), 1 risk(s), 1 note(s)

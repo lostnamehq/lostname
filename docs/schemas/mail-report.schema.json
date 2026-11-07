@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lostname.be/schemas/mail-report.schema.json",
+  "title": "lostname mail report",
+  "description": "Output of `lostname mail --json`: the zone's mail posture and findings about its mail records, read offline from the zone (only names the zone contains; DKIM selectors are never guessed). Verdict: fail when any finding is a blocker (with --strict, a risk too).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "origin", "source", "verdict", "counts", "posture", "findings"],
+  "properties": {
+    "schema": {"const": "lostname.mail/v0"},
+    "origin": {"type": "string"},
+    "source": {"type": "string"},
+    "verdict": {"enum": ["pass", "fail"]},
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocker", "risk", "note"],
+      "properties": {
+        "blocker": {"type": "integer", "minimum": 0},
+        "risk": {"type": "integer", "minimum": 0},
+        "note": {"type": "integer", "minimum": 0}
+      }
+    },
+    "posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "mx", "dkim", "bimi", "tlsa"],
+      "properties": {
+        "domain": {"type": "string"},
+        "mx": {"type": "array", "items": {"type": "string"}},
+        "spf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "all": {"enum": ["+", "-", "~", "?"]},
+            "includes": {"type": "array", "items": {"type": "string"}},
+            "redirect": {"type": "string"}
+          }
+        },
+        "dmarc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reports"],
+          "properties": {
+            "policy": {"type": "string"},
+            "subpolicy": {"type": "string"},
+            "reports": {"type": "boolean"}
+          }
+        },
+        "dkim": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["selector", "revoked"],
+            "properties": {
+              "selector": {"type": "string"},
+              "key_type": {"type": "string"},
+              "revoked": {"type": "boolean"},
+              "alias": {"type": "string"}
+            }
+          }
+        },
+        "mta_sts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id"],
+          "properties": {"id": {"type": "string"}}
+        },
+        "tls_rpt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["destinations"],
+          "properties": {"destinations": {"type": "integer", "minimum": 1}}
+        },
+        "bimi": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["selector"],
+            "properties": {"selector": {"type": "string"}}
+          }
+        },
+        "tlsa": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "usage", "selector", "matching_type"],
+            "properties": {
+              "name": {"type": "string"},
+              "usage": {"type": "integer", "minimum": 0},
+              "selector": {"type": "integer", "minimum": 0},
+              "matching_type": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule", "severity", "name", "type", "message", "ref"],
+        "properties": {
+          "rule": {"type": "string", "pattern": "^M-[0-9]{2}$"},
+          "severity": {"enum": ["blocker", "risk", "note"]},
+          "name": {"type": "string"},
+          "type": {"type": "string"},
+          "message": {"type": "string"},
+          "ref": {"type": "string"}
+        }
+      }
+    }
+  }
+}

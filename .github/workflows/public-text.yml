@@ -57,9 +57,12 @@ jobs:
           BODY: ${{ github.event.comment.body || github.event.review.body || github.event.pull_request.body || github.event.issue.body || (github.event_name == 'discussion' && github.event.discussion.body) || '' }}
           # the private patterns only for the project's own people: for anyone else a pass/fail would be an oracle
           LOSTNAME_PRIVATE_PATTERNS: ${{ contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.pull_request.author_association || github.event.issue.author_association || github.event.discussion.author_association) && secrets.LOSTNAME_PRIVATE_PATTERNS || '' }}
+          # A Dependabot pull request's own title and body quote upstream release notes, which name CVEs: those flags
+          # are reported, not failed. Hard failures still fail; the diff step below is unchanged.
+          FLAGS_OK: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.sender.login == 'dependabot[bot]' && '--flags-ok' || '' }}
         run: |
           printf '%s\n%s\n' "$TITLE" "$BODY" > "$RUNNER_TEMP/text.md"
-          python tools/public_text_check.py --text "$RUNNER_TEMP/text.md"
+          python tools/public_text_check.py --text "$RUNNER_TEMP/text.md" $FLAGS_OK
       - name: Check the diff and commit messages
         if: github.event_name == 'pull_request_target'
         env:

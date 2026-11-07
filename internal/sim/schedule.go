@@ -5,7 +5,8 @@ package sim
 // unlock covers one change only).
 //   - Domain Shield (.be): the registrar's shield users unlock for 24 hours, then it re-locks by itself.
 //   - Domain Guard (.be): DNS Belgium phones a named person for each change request and answers within 2 working
-//     days; the registrar then has 48 hours to make that one change.
+//     days; the registrar then has 48 hours to make that one change. Working days are not hours (M11): the default
+//     plans the upper bound across a weekend, 4 calendar days, because a plan must hold whatever day it starts.
 //
 // Profiles and their sources live in the config (sim.locks); nothing here assumes them.
 type Lock struct {
@@ -21,28 +22,21 @@ type Schedule struct {
 	Unlocks       int // unlock requests needed
 }
 
-func sameKeys(a, b []Key) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for _, k := range a {
-		if !has(b, k) {
-			return false
-		}
-	}
-	return true
-}
+// sameKeys and sameNames compare as multisets (L15): [k k] and [k j] differ, whatever the order.
+func sameKeys(a, b []Key) bool { return sameMultiset(a, b) }
 
-func sameNames(a, b []string) bool {
+func sameNames(a, b []string) bool { return sameMultiset(a, b) }
+
+func sameMultiset[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	seen := map[string]bool{}
-	for _, n := range a {
-		seen[n] = true
+	n := map[T]int{}
+	for _, x := range a {
+		n[x]++
 	}
-	for _, n := range b {
-		if !seen[n] {
+	for _, x := range b {
+		if n[x]--; n[x] < 0 {
 			return false
 		}
 	}
