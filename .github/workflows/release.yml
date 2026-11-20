@@ -40,7 +40,7 @@ jobs:
           # outside the checkout: a file in it would stamp every binary vcs.modified=true
           git -c gpg.ssh.allowedSignersFile=lostname.allowed_signers tag -v "$TAG" 2>&1 | tee "$RUNNER_TEMP/tag-verify.txt"
           grep -q '^Good "git" signature' "$RUNNER_TEMP/tag-verify.txt"
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: "1.27.3"
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
